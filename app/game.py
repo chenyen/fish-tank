@@ -26,12 +26,16 @@ TANK_CAP = 6                     # 鱼缸容量（所有鱼种共用）
 # 鱼苗种类：价格、体型、产币系数各不相同
 SPECIES = {
     "carp": {
-        "key": "carp", "name": "鲤鱼", "price": 20, "size": 1.0, "coin": 1.0,
+        "key": "carp", "name": "鲤鱼", "price": 20, "size": 0.85, "coin": 1.0,
         "desc": "好养活的常规鱼苗，游动活跃，产币稳定",
     },
     "shark": {
-        "key": "shark", "name": "鲨鱼", "price": 60, "size": 1.4, "coin": 1.8,
-        "desc": "体型大、巡游范围广，产币最多，但价格也最贵",
+        "key": "shark", "name": "鲨鱼", "price": 60, "size": 1.9, "coin": 1.8,
+        "desc": "缸里体型最大的家伙，巡游范围广、产币最多，价格也最贵",
+    },
+    "clown": {
+        "key": "clown", "name": "小丑鱼", "price": 30, "size": 0.75, "coin": 1.25,
+        "desc": "橙白条纹的小家伙，爱在中层来回穿梭，灵活又耐看",
     },
     "shrimp": {
         "key": "shrimp", "name": "小虾", "price": 12, "size": 0.55, "coin": 0.5,
@@ -42,7 +46,7 @@ SPECIES = {
         "desc": "基本不移动，安静地一张一合扇动贝壳",
     },
 }
-SPECIES_ORDER = ["carp", "shark", "shrimp", "clam"]
+SPECIES_ORDER = ["carp", "clown", "shark", "shrimp", "clam"]
 DEFAULT_SPECIES = "carp"
 FISH_PRICE = SPECIES[DEFAULT_SPECIES]["price"]   # 默认鱼苗价格
 

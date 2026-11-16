@@ -328,7 +328,7 @@
 
   /* ------------------------------------------------------ 买鱼苗弹窗 */
 
-  const SP_ICON = { carp: '🐟', shark: '🦈', shrimp: '🦐', clam: '🐚' };
+  const SP_ICON = { carp: '🐟', clown: '🐠', shark: '🦈', shrimp: '🦐', clam: '🐚' };
 
   function openShop() {
     if (!state) return;
@@ -502,8 +502,9 @@
 
   // 鱼种表现参数：size 体型、行为在 newSim 里按种类覆写
   const SPECIES_FX = {
-    carp: { size: 1.0 },
-    shark: { size: 1.4 },
+    carp: { size: 0.85 },
+    clown: { size: 0.75 },
+    shark: { size: 1.9 },
     shrimp: { size: 0.55 },
     clam: { size: 1.0 },
   };
@@ -564,6 +565,17 @@
       s.amp = rnd(4, 12);
       s.idleChance = 0.06;
       s.idleRange = [0.2, 0.8];
+      s.y = H * rnd(s.bandLo, s.bandHi);
+    } else if (key === 'clown') {
+      // 小丑鱼：中层来回穿梭，速度偏快、起伏明显、很少停
+      s.pattern = Math.random() < 0.5 ? 'sine' : 'cruise';
+      s.bandLo = rnd(0.24, 0.4);
+      s.bandHi = Math.min(0.72, s.bandLo + rnd(0.16, 0.3));
+      s.speedK = rnd(0.95, 1.45);
+      s.wobble = rnd(1.1, 2.0);
+      s.amp = rnd(10, 20);
+      s.idleChance = 0.18;
+      s.idleRange = [0.3, 1.2];
       s.y = H * rnd(s.bandLo, s.bandHi);
     } else if (key === 'shrimp') {
       // 小虾：只在缸底附近短距离挪一点，大部分时间趴着
@@ -860,6 +872,7 @@
       drawShadow(r);
       if (key === 'shrimp') drawShrimp(f, r, sat, light);
       else if (key === 'shark') drawShark(f, r, sat, light);
+      else if (key === 'clown') drawClown(f, s, r, sat, light, wag);
       else drawCarp(f, s, r, sat, light, wag);
     }
     ctx.restore();
@@ -1030,6 +1043,109 @@
     ctx.moveTo(r * 1.12, r * 0.16);
     ctx.quadraticCurveTo(r * 0.86, r * 0.3, r * 0.6, r * 0.2);
     ctx.strokeStyle = 'rgba(8,34,46,.45)';
+    ctx.lineWidth = Math.max(1, r * 0.05);
+    ctx.stroke();
+  }
+
+  // 小丑鱼：橙底三条白纹、圆鳍带黑边，爱在中层穿梭
+  function drawClown(f, s, r, sat, light, wag) {
+    const orange = 'hsl(22, 92%, 60%)';
+    const orangeD = 'hsl(16, 88%, 50%)';
+    const ink = 'rgba(18, 26, 34, .85)';
+    const lw = Math.max(1.2, r * 0.085);
+
+    // 尾鳍
+    ctx.save();
+    ctx.translate(-r * 0.9, 0);
+    ctx.rotate(wag);
+    ctx.beginPath();
+    ctx.ellipse(-r * 0.26, 0, r * 0.4, r * 0.46, 0, 0, 6.2832);
+    ctx.fillStyle = orangeD;
+    ctx.fill();
+    ctx.lineWidth = lw;
+    ctx.strokeStyle = ink;
+    ctx.stroke();
+    ctx.restore();
+
+    // 背鳍
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.3, -r * 0.36);
+    ctx.quadraticCurveTo(0, -r * 0.95, r * 0.42, -r * 0.34);
+    ctx.closePath();
+    ctx.fillStyle = orangeD;
+    ctx.fill();
+    ctx.lineWidth = lw;
+    ctx.strokeStyle = ink;
+    ctx.stroke();
+
+    // 腹鳍
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.22, r * 0.32);
+    ctx.quadraticCurveTo(r * 0.02, r * 0.82, r * 0.36, r * 0.3);
+    ctx.closePath();
+    ctx.fillStyle = orangeD;
+    ctx.fill();
+    ctx.stroke();
+
+    // 身体
+    const bg = ctx.createLinearGradient(0, -r * 0.55, 0, r * 0.55);
+    bg.addColorStop(0, 'hsl(28, 96%, 68%)');
+    bg.addColorStop(1, orangeD);
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(0, 0, r * 1.0, r * 0.6, 0, 0, 6.2832);
+    ctx.fillStyle = bg;
+    ctx.fill();
+    ctx.clip();
+
+    // 三条白纹（靠近头部的最宽）
+    const bands = [
+      { x: r * 0.56, w: r * 0.2, tilt: -0.18 },
+      { x: r * 0.02, w: r * 0.27, tilt: 0.05 },
+      { x: -r * 0.56, w: r * 0.17, tilt: 0.2 },
+    ];
+    for (const b of bands) {
+      ctx.save();
+      ctx.translate(b.x, 0);
+      ctx.rotate(b.tilt);
+      ctx.fillStyle = 'rgba(255, 252, 245, .97)';
+      ctx.fillRect(-b.w / 2, -r * 0.75, b.w, r * 1.5);
+      ctx.strokeStyle = 'rgba(18, 26, 34, .55)';
+      ctx.lineWidth = Math.max(1, r * 0.04);
+      ctx.beginPath();
+      ctx.moveTo(-b.w / 2, -r * 0.75);
+      ctx.lineTo(-b.w / 2, r * 0.75);
+      ctx.moveTo(b.w / 2, -r * 0.75);
+      ctx.lineTo(b.w / 2, r * 0.75);
+      ctx.stroke();
+      ctx.restore();
+    }
+    ctx.restore();
+
+    // 身体轮廓
+    ctx.beginPath();
+    ctx.ellipse(0, 0, r * 1.0, r * 0.6, 0, 0, 6.2832);
+    ctx.lineWidth = lw;
+    ctx.strokeStyle = ink;
+    ctx.stroke();
+
+    // 眼睛
+    ctx.beginPath();
+    ctx.arc(r * 0.64, -r * 0.14, r * 0.16, 0, 6.2832);
+    ctx.fillStyle = '#fff';
+    ctx.fill();
+    ctx.lineWidth = Math.max(1, r * 0.045);
+    ctx.strokeStyle = ink;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(r * 0.67, -r * 0.14, r * 0.08, 0, 6.2832);
+    ctx.fillStyle = '#0b1c24';
+    ctx.fill();
+
+    // 嘴
+    ctx.beginPath();
+    ctx.arc(r * 0.92, r * 0.08, r * 0.1, 0.5, 1.5);
+    ctx.strokeStyle = 'rgba(40,26,16,.55)';
     ctx.lineWidth = Math.max(1, r * 0.05);
     ctx.stroke();
   }
