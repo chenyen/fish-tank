@@ -18,11 +18,51 @@ GROWTH_PER_SEC = 1 / 75          # 饱食状态下每分钟成长 0.8 点（约 
 GROWTH_HUNGER_MIN = 1            # 低于该饱食度停止成长
 
 FOOD_REGEN_SEC = 900             # 每 15 分钟自然补充 1 份饲料
-FOOD_CAP = 10                    # 饲料上限
 FEED_AMOUNT = 20                 # 每次喂食恢复饱食度
+# 饲料不设上限：只按时间自然恢复，囤多少都行
 
-TANK_CAP = 6                     # 鱼缸容量
-FISH_PRICE = 20                  # 买一条鱼苗
+TANK_CAP = 6                     # 鱼缸容量（所有鱼种共用）
+
+# 鱼苗种类：价格、体型、产币系数各不相同
+SPECIES = {
+    "carp": {
+        "key": "carp", "name": "鲤鱼", "price": 20, "size": 1.0, "coin": 1.0,
+        "desc": "好养活的常规鱼苗，游动活跃，产币稳定",
+    },
+    "shark": {
+        "key": "shark", "name": "鲨鱼", "price": 60, "size": 1.4, "coin": 1.8,
+        "desc": "体型大、巡游范围广，产币最多，但价格也最贵",
+    },
+    "shrimp": {
+        "key": "shrimp", "name": "小虾", "price": 12, "size": 0.55, "coin": 0.5,
+        "desc": "只贴着缸底短距离挪动，大部分时间趴着不动",
+    },
+    "clam": {
+        "key": "clam", "name": "砗磲", "price": 35, "size": 1.0, "coin": 0.8,
+        "desc": "基本不移动，安静地一张一合扇动贝壳",
+    },
+}
+SPECIES_ORDER = ["carp", "shark", "shrimp", "clam"]
+DEFAULT_SPECIES = "carp"
+FISH_PRICE = SPECIES[DEFAULT_SPECIES]["price"]   # 默认鱼苗价格
+
+
+def species_of(fish: dict) -> str:
+    """取鱼种类，缺失或未知一律回落到默认鱼苗。"""
+    key = (fish or {}).get("species") or DEFAULT_SPECIES
+    return key if key in SPECIES else DEFAULT_SPECIES
+
+
+def species_meta(key: str | None) -> dict:
+    return SPECIES.get(key or DEFAULT_SPECIES, SPECIES[DEFAULT_SPECIES])
+
+
+def species_price(key: str | None) -> int:
+    return species_meta(key)["price"]
+
+
+def species_catalog() -> list:
+    return [SPECIES[k] for k in SPECIES_ORDER]
 FOOD_PACK = 5                    # 一份饲料包数量
 FOOD_PACK_PRICE = 8              # 一份饲料包价格
 
@@ -82,10 +122,10 @@ def efficiency(hunger: float) -> float:
     return HUNGER_MIN_FACTOR
 
 
-def coin_rate(growth: float, hunger: float) -> float:
-    """该鱼当前的实际产币速度（金币/小时）。"""
+def coin_rate(growth: float, hunger: float, species: str | None = None) -> float:
+    """该鱼当前的实际产币速度（金币/小时）。鱼种自带产币系数。"""
     base = COIN_RATES[STAGES[stage_index(growth)]["key"]]
-    return base * efficiency(hunger)
+    return base * efficiency(hunger) * species_meta(species)["coin"]
 
 
 def is_adult(fish: dict) -> bool:
@@ -135,13 +175,11 @@ def tick(tank: dict, fish_list: list, now: float) -> dict:
     while elapsed < dt_total:
         d = min(SIM_STEP, dt_total - elapsed)
 
-        # 饲料自然恢复
+        # 饲料自然恢复（不设上限）
         tank["food_acc"] += d
-        while tank["food_acc"] >= FOOD_REGEN_SEC and tank["food"] < FOOD_CAP:
+        while tank["food_acc"] >= FOOD_REGEN_SEC:
             tank["food_acc"] -= FOOD_REGEN_SEC
             tank["food"] += 1
-        if tank["food"] >= FOOD_CAP:
-            tank["food_acc"] = 0.0
 
         for f in fish_list:
             before_idx = stage_index(f["growth"])
@@ -163,7 +201,7 @@ def tick(tank: dict, fish_list: list, now: float) -> dict:
                         })
 
             # 产币（按当前饱食度对应的产能，累积到待收）
-            tank["pending"] += coin_rate(f["growth"], f["hunger"]) / 3600 * d
+            tank["pending"] += coin_rate(f["growth"], f["hunger"], f.get("species")) / 3600 * d
 
             # 饥饿衰减
             f["hunger"] = max(0.0, f["hunger"] - HUNGER_DECAY_PER_SEC * d)

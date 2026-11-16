@@ -144,9 +144,12 @@ def serialize(tank: dict, fish_list: list, gain: dict, title: str = DEFAULT_TITL
     for f in fish_list:
         st = game.stage_of(f["growth"])
         eff = game.efficiency(f["hunger"])
+        sp = game.species_of(f)
         fish_out.append({
             "id": f["id"],
             "name": f["name"],
+            "species": sp,
+            "species_name": game.species_meta(sp)["name"],
             "growth": round(f["growth"], 1),
             "hunger": round(f["hunger"], 1),
             "hue": f["hue"],
@@ -154,13 +157,12 @@ def serialize(tank: dict, fish_list: list, gain: dict, title: str = DEFAULT_TITL
             "stage": st,
             "adult": game.is_adult(f),
             "eff": eff,
-            "coin_rate": round(game.coin_rate(f["growth"], f["hunger"]), 2),
+            "coin_rate": round(game.coin_rate(f["growth"], f["hunger"], sp), 2),
             "base_rate": game.COIN_RATES[st["key"]],
         })
     food = tank["food"]
-    next_food_in = None
-    if food < game.FOOD_CAP:
-        next_food_in = max(0, int(game.FOOD_REGEN_SEC - tank["food_acc"]))
+    # 饲料不设上限：始终给出下一份的倒计时
+    next_food_in = max(0, int(game.FOOD_REGEN_SEC - tank["food_acc"]))
     return {
         "title": title,
         "coins": int(tank["coins"]),
@@ -170,13 +172,15 @@ def serialize(tank: dict, fish_list: list, gain: dict, title: str = DEFAULT_TITL
         "payout_interval": game.PAYOUT_INTERVAL,
         "income_per_hour": round(sum(f["coin_rate"] for f in fish_out), 2),
         "food": food,
-        "food_cap": game.FOOD_CAP,
+        "food_cap": None,
         "next_food_in": next_food_in,
         "capacity": game.TANK_CAP,
         "fish": fish_out,
         "gain": gain,
         "prices": {
             "fish": game.FISH_PRICE,
+            "fish_min": min(s["price"] for s in game.species_catalog()),
+            "species": game.species_catalog(),
             "food_pack": game.FOOD_PACK_PRICE,
             "food_pack_size": game.FOOD_PACK,
             "feed_amount": game.FEED_AMOUNT,
@@ -197,6 +201,7 @@ class Credentials(BaseModel):
 
 class FishCreate(BaseModel):
     name: str = ""
+    species: str = game.DEFAULT_SPECIES
 
 
 class FeedReq(BaseModel):
@@ -290,18 +295,23 @@ def state(request: Request):
 
 @app.post("/api/fish")
 def add_fish(body: FishCreate, request: Request):
+    key = (body.species or game.DEFAULT_SPECIES).strip()
+    if key not in game.SPECIES:
+        raise HTTPException(400, "没有这种鱼苗")
+    price = game.species_price(key)
     with _lock, db.session() as conn:
         user = current_user(request, conn)
         tank, fish_list, gain = advance(conn, user["id"])
         if len(fish_list) >= game.TANK_CAP:
             raise HTTPException(400, f"鱼缸最多养 {game.TANK_CAP} 条鱼")
-        if tank["coins"] < game.FISH_PRICE:
-            raise HTTPException(400, f"金币不足，需要 {game.FISH_PRICE} 金币")
+        if tank["coins"] < price:
+            raise HTTPException(400, f"金币不足，{game.species_meta(key)['name']}需要 {price} 金币")
         name = (body.name or "").strip()[:12] or random.choice(DEFAULT_NAMES)
-        tank["coins"] -= game.FISH_PRICE
+        tank["coins"] -= price
         conn.execute(
-            "INSERT INTO fish(tank_id, name, growth, hunger, hue, born) VALUES(?,?,?,?,?,?)",
-            (tank["id"], name, 0.0, 70.0, random.randint(0, 359), time.time()),
+            "INSERT INTO fish(tank_id, name, growth, hunger, hue, species, born) "
+            "VALUES(?,?,?,?,?,?,?)",
+            (tank["id"], name, 0.0, 70.0, random.randint(0, 359), key, time.time()),
         )
         save_world(conn, tank, fish_list)
         fish_list = get_fish(conn, tank["id"])
@@ -363,16 +373,10 @@ def buy_food(request: Request):
     with _lock, db.session() as conn:
         user = current_user(request, conn)
         tank, fish_list, gain = advance(conn, user["id"])
-        if tank["food"] >= game.FOOD_CAP:
-            raise HTTPException(400, "饲料已经装满了")
-        if tank["food"] + game.FOOD_PACK > game.FOOD_CAP:
-            raise HTTPException(
-                400, f"饲料快满了（{tank['food']}/{game.FOOD_CAP}），先喂掉一些再换购"
-            )
         if tank["coins"] < game.FOOD_PACK_PRICE:
             raise HTTPException(400, f"金币不足，需要 {game.FOOD_PACK_PRICE} 金币")
         tank["coins"] -= game.FOOD_PACK_PRICE
-        tank["food"] = min(game.FOOD_CAP, tank["food"] + game.FOOD_PACK)
+        tank["food"] += game.FOOD_PACK        # 饲料不设上限，可以一直囤
         save_world(conn, tank, fish_list)
         return serialize(tank, fish_list, gain, tank_title(conn, tank["id"]))
 

@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS fish (
     growth  REAL NOT NULL DEFAULT 0,
     hunger  REAL NOT NULL DEFAULT 60,
     hue     INTEGER NOT NULL DEFAULT 200,
+    species TEXT NOT NULL DEFAULT 'carp',
     born    REAL NOT NULL,
     FOREIGN KEY (tank_id) REFERENCES tanks(id)
 );
@@ -68,6 +69,11 @@ def _migrate(conn) -> None:
         conn.execute("ALTER TABLE tanks ADD COLUMN next_payout REAL")
     nxt = math.ceil(time.time() / 3600) * 3600
     conn.execute("UPDATE tanks SET next_payout=? WHERE next_payout IS NULL", (nxt,))
+
+    # 兼容旧库：补鱼种类字段（老鱼一律当鲤鱼）
+    fcols = {r["name"] for r in conn.execute("PRAGMA table_info(fish)")}
+    if "species" not in fcols:
+        conn.execute("ALTER TABLE fish ADD COLUMN species TEXT NOT NULL DEFAULT 'carp'")
     conn.commit()
 
 
