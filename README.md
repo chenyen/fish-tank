@@ -23,6 +23,23 @@ docker compose up -d --build
 
 打开 <http://localhost:8848>，注册账号就能开始。
 
+### 本地开发（不用 Docker，热重载）
+
+```powershell
+.\start-dev.ps1          # 首次会自动创建 .venv 并装依赖
+```
+
+或手动：
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+$env:DB_PATH="D:\dockers\fish-tank\data\tank.db"; $env:FT_SECRET="fish-tank-dev-secret"
+cd app; ..\.venv\Scripts\python.exe -m uvicorn main:app --host 127.0.0.1 --port 8848 --reload
+```
+
+本地库落在 `./data/tank.db`（与容器内 `/data/tank.db` 同一份结构），改完代码保存即生效。
+
 停止 / 卸载：
 
 ```bash
