@@ -146,16 +146,7 @@
     for (const f of data.fish) {
       seen.add(f.id);
       if (!sims.has(f.id)) {
-        sims.set(f.id, {
-          x: W * (0.2 + Math.random() * 0.6),
-          y: H * (0.25 + Math.random() * 0.55),
-          tx: W * (0.15 + Math.random() * 0.7),
-          ty: H * (0.22 + Math.random() * 0.6),
-          dir: Math.random() > 0.5 ? 1 : -1,
-          phase: Math.random() * Math.PI * 2,
-          eat: 0,
-          hold: 0,
-        });
+        sims.set(f.id, newSim());
       }
     }
     for (const id of [...sims.keys()]) if (!seen.has(id)) sims.delete(id);
@@ -362,6 +353,123 @@
     return 26 * f.stage.scale * depth;
   }
 
+  /* ---------------------------------------------- 每条鱼独立的游动性格
+     pattern  游动模式    speedK 速度系数   wobble/amp 摆尾节奏与幅度
+     bandLo/Hi 偏好水深带  idle 停顿   burst 冲刺
+     参数在鱼入场时随机生成，因此同一缸里不会有两条轨迹重合。            */
+
+  const PATTERNS = ['cruise', 'cruise', 'sine', 'circle', 'hover', 'bottom'];
+  const rnd = (a, b) => a + Math.random() * (b - a);
+
+  function newSim() {
+    const lo = rnd(0.12, 0.45);
+    let hi = Math.min(0.9, lo + rnd(0.15, 0.4));
+    const s = {
+      x: W * rnd(0.15, 0.85),
+      y: H * rnd(lo, hi),
+      tx: W * rnd(0.1, 0.9),
+      ty: H * rnd(lo, hi),
+      dir: Math.random() > 0.5 ? 1 : -1,
+      phase: rnd(0, 6.2832),
+      eat: 0,
+      hold: 0,
+      pattern: PATTERNS[Math.floor(Math.random() * PATTERNS.length)],
+      speedK: rnd(0.55, 1.5),
+      wobble: rnd(0.45, 2.5),
+      amp: rnd(5, 22),
+      bandLo: lo,
+      bandHi: hi,
+      idle: 0,
+      burst: 0,
+      angle: rnd(0, 6.2832),
+      radiusXR: rnd(0.05, 0.15),
+      radiusYR: rnd(0.05, 0.17),
+      cxr: rnd(0.28, 0.72),
+      cyr: rnd(0.32, 0.68),
+      drift: rnd(0.12, 0.5),
+    };
+    if (s.pattern === 'bottom') {           // 贴底巡游
+      s.bandLo = 0.68; s.bandHi = 0.9;
+      s.ty = H * rnd(0.72, 0.88);
+      s.speedK *= 0.75;
+    }
+    if (s.pattern === 'hover') {            // 小范围悬停
+      s.bandLo = rnd(0.2, 0.55);
+      s.bandHi = Math.min(0.9, s.bandLo + rnd(0.08, 0.2));
+      s.amp = rnd(10, 26);
+    }
+    return s;
+  }
+
+  function pickTarget(s) {
+    const lo = Math.max(40, H * s.bandLo);
+    const hi = Math.min(H - 40, Math.max(lo + 30, H * s.bandHi));
+    s.tx = W * rnd(0.08, 0.92);
+    s.ty = rnd(lo, hi);
+  }
+
+  function stepFish(s, dt, speed) {
+    // 随机打盹：让节奏错开，避免整缸鱼同步
+    if (s.idle > 0) {
+      s.idle -= dt;
+      s.x += Math.cos(s.phase * s.wobble) * 5 * dt;
+      s.y += Math.sin(s.phase * s.wobble * 1.3) * 7 * dt;
+      return;
+    }
+    if (s.burst > 0) s.burst = Math.max(0, s.burst - dt);
+    else if (Math.random() < dt * 0.1) s.burst = rnd(0.45, 1.1);
+    const v = speed * s.speedK * (s.burst > 0 ? 1.75 : 1);
+
+    if (s.pattern === 'circle') {
+      // 沿自己的椭圆轨迹巡游，圆心缓慢漂移
+      s.angle += dt * (0.45 + s.speedK * 0.4) * (s.dir > 0 ? 1 : -1);
+      s.cxr += Math.sin(s.angle * s.drift) * dt * 0.05;
+      s.cyr += Math.cos(s.angle * s.drift * 1.3) * dt * 0.04;
+      s.cxr = Math.max(0.2, Math.min(0.8, s.cxr));
+      s.cyr = Math.max(0.24, Math.min(0.76, s.cyr));
+      const nx = W * s.cxr + Math.cos(s.angle) * W * s.radiusXR;
+      const ny = H * s.cyr + Math.sin(s.angle) * H * s.radiusYR;
+      const k = Math.min(1, dt * 4.5);
+      if (Math.abs(nx - s.x) > 0.5) s.dir = nx > s.x ? 1 : -1;
+      s.x += (nx - s.x) * k;
+      s.y += (ny - s.y) * k;
+      return;
+    }
+
+    if (s.pattern === 'sine') {
+      // 横向波浪前进，只在自己那条水层里起伏
+      s.x += s.dir * v * dt;
+      const mid = H * (s.bandLo + s.bandHi) / 2;
+      const pull = (mid - s.y) * 0.55 * dt;
+      s.y += Math.cos(s.phase * s.wobble) * s.amp * dt * 1.4 + pull;
+      if (s.x > W - 30) { s.x = W - 30; s.dir = -1; }
+      if (s.x < 30) { s.x = 30; s.dir = 1; }
+      return;
+    }
+
+    if (s.pattern === 'hover') {
+      // 原地小幅摆尾，偶尔换一个落脚点
+      if (Math.random() < dt * 0.18) pickTarget(s);
+      const k = Math.min(1, dt * 0.7);
+      s.x += (s.tx - s.x) * k + Math.cos(s.phase * s.wobble * 0.7) * s.amp * dt * 0.7;
+      s.y += (s.ty - s.y) * k + Math.sin(s.phase * s.wobble) * s.amp * dt * 0.8;
+      if (Math.abs(s.tx - s.x) > 1) s.dir = s.tx > s.x ? 1 : -1;
+      return;
+    }
+
+    // cruise / bottom：朝自己的目标点游，叠加摆动
+    const dx = s.tx - s.x, dy = s.ty - s.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist < 14) {
+      if (Math.random() < 0.42) s.idle = rnd(0.4, 2.2);
+      pickTarget(s);
+      return;
+    }
+    s.x += (dx / dist) * v * dt;
+    s.y += (dy / dist) * v * dt + Math.sin(s.phase * s.wobble) * s.amp * dt * 0.65;
+    if (Math.abs(dx) > 2) s.dir = dx > 0 ? 1 : -1;
+  }
+
   function update(dt) {
     if (!state) return;
     for (const f of state.fish) {
@@ -382,21 +490,12 @@
 
       const energy = f.hunger < 15 ? 0.45 : 1;
       const speed = (26 + f.stage.scale * 22) * energy;
+      stepFish(s, dt, speed);
 
-      const dx = s.tx - s.x, dy = s.ty - s.y;
-      const dist = Math.hypot(dx, dy);
-      if (dist < 12) {
-        s.tx = W * (0.1 + Math.random() * 0.8);
-        s.ty = H * (0.18 + Math.random() * 0.66);
-      } else {
-        s.x += (dx / dist) * speed * dt;
-        s.y += (dy / dist) * speed * dt;
-        if (Math.abs(dx) > 2) s.dir = dx > 0 ? 1 : -1;
-      }
       // 边界兜底
       s.x = Math.max(30, Math.min(W - 30, s.x));
       s.y = Math.max(40, Math.min(H - 40, s.y));
-      s.phase += dt * (2.2 + speed * 0.05);
+      s.phase += dt * (2.2 + speed * 0.05) * (0.7 + s.speedK * 0.4);
       if (s.eat > 0) s.eat = Math.max(0, s.eat - dt * 1.6);
     }
 
