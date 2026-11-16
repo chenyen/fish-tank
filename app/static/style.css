@@ -229,7 +229,7 @@ header {
   overflow: hidden;
 }
 
-canvas { display: block; width: 100%; height: 100%; cursor: pointer; }
+canvas { display: block; width: 100%; height: 100%; cursor: default; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 
 #toast {
   position: absolute;
@@ -289,6 +289,8 @@ canvas { display: block; width: 100%; height: 100%; cursor: pointer; }
 }
 
 .fishitem:hover { border-color: rgba(75, 224, 200, .5); background: rgba(75, 224, 200, .08); }
+
+.panelhint { font-size: 10.5px; color: #7fa0b3; letter-spacing: .3px; margin: -2px 0 8px; opacity: .85; }
 
 .fishitem .top {
   display: flex;

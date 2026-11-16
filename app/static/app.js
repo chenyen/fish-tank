@@ -154,6 +154,7 @@
           dir: Math.random() > 0.5 ? 1 : -1,
           phase: Math.random() * Math.PI * 2,
           eat: 0,
+          hold: 0,
         });
       }
     }
@@ -208,7 +209,7 @@
       const hunger = Math.round(f.hunger);
       const growPct = Math.round(f.stage.progress * 100);
       const ageH = (f.age / 3600).toFixed(1);
-      return `<div class="fishitem" data-id="${f.id}">
+      return `<div class="fishitem" data-id="${f.id}" title="点击喂食">
         <div class="top"><b>${esc(f.name)}</b><span class="stag">${f.stage.name}</span></div>
         <div class="bar grow"><i style="width:${growPct}%"></i></div>
         <div class="bar hunger"><i style="width:${hunger}%"></i></div>
@@ -366,6 +367,19 @@
     for (const f of state.fish) {
       const s = sims.get(f.id);
       if (!s) continue;
+
+      // 被拖拽的鱼完全跟随指针，不参与自主游动
+      if (drag && drag.id === f.id) {
+        s.phase += dt * 6;
+        continue;
+      }
+      // 刚放下的鱼先原地停留一会儿
+      if (s.hold > 0) {
+        s.hold = Math.max(0, s.hold - dt);
+        s.phase += dt * 1.8;
+        continue;
+      }
+
       const energy = f.hunger < 15 ? 0.45 : 1;
       const speed = (26 + f.stage.scale * 22) * energy;
 
@@ -448,7 +462,11 @@
     const list = state.fish
       .map((f) => ({ f, s: sims.get(f.id) }))
       .filter((o) => o.s)
-      .sort((a, b) => a.s.y - b.s.y);
+      .sort((a, b) => {
+        const ad = drag && drag.id === a.f.id ? 1 : 0;
+        const bd = drag && drag.id === b.f.id ? 1 : 0;
+        return ad - bd || a.s.y - b.s.y;   // 拖拽中的鱼画在最上层
+      });
 
     for (const { f, s } of list) {
       drawFish(f, s, t);
@@ -612,25 +630,81 @@
 
   /* ------------------------------------------------------------ 交互 */
 
-  canvas.addEventListener('mousemove', (e) => {
-    if (!state) return;
+  // 拖拽：按住鱼跟着指针走；点鱼不再喂食，喂食只在右侧「我的鱼」列表里触发
+  let drag = null;      // {id, ox, oy, moved, px, py}
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+  function localPos(e) {
     const rect = canvas.getBoundingClientRect();
-    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
-    hoverId = hitTest(mx, my);
-    canvas.style.cursor = hoverId ? 'pointer' : 'default';
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  }
+
+  canvas.addEventListener('pointerdown', (e) => {
+    if (!state) return;
+    const { x, y } = localPos(e);
+    const id = hitTest(x, y);
+    if (id == null) return;          // 空白处交给 pointerup 处理
+    const s = sims.get(id);
+    if (!s) return;
+    drag = { id, ox: s.x - x, oy: s.y - y, moved: false, px: x, py: y };
+    s.hold = 0;
+    hoverId = id;
+    canvas.style.cursor = 'grabbing';
+    try { canvas.setPointerCapture(e.pointerId); } catch (err) { }
+    e.preventDefault();
   });
 
-  canvas.addEventListener('click', (e) => {
+  canvas.addEventListener('pointermove', (e) => {
     if (!state) return;
-    const rect = canvas.getBoundingClientRect();
-    const id = hitTest(e.clientX - rect.left, e.clientY - rect.top);
-    if (id) feed(id);
-    else {
-      // 点击空白：鱼朝该处游去
-      for (const [fid, s] of sims) {
-        if (Math.random() > 0.6) { s.tx = e.clientX - rect.left; s.ty = e.clientY - rect.top; }
-      }
+    const { x, y } = localPos(e);
+    if (drag) {
+      const s = sims.get(drag.id);
+      if (!s) { drag = null; return; }
+      if (Math.hypot(x - drag.px, y - drag.py) > 3) drag.moved = true;
+      // 指针位移映射成鱼的位移，保留抓取时的相对偏移，手感更自然
+      s.x = clamp(x + drag.ox, 26, Math.max(26, W - 26));
+      s.y = clamp(y + drag.oy, 36, Math.max(36, H - 36));
+      s.tx = s.x; s.ty = s.y;
+      if (Math.abs(x - drag.px) > 0.5) s.dir = x > drag.px ? 1 : -1;
+      drag.px = x; drag.py = y;
+      e.preventDefault();
+      return;
     }
+    hoverId = hitTest(x, y);
+    canvas.style.cursor = hoverId != null ? 'grab' : 'default';
+  });
+
+  function endDrag(e) {
+    if (!state) { drag = null; return; }
+    const { x, y } = localPos(e);
+    if (drag) {
+      const s = sims.get(drag.id);
+      if (s) {
+        s.hold = 1.2;                // 松手后先原地停留，不要立刻游走
+        s.tx = s.x; s.ty = s.y;
+      }
+      if (!drag.moved) toast('按住鱼可以拖动它；喂食请点右侧「我的鱼」', 2400);
+      drag = null;
+      canvas.style.cursor = hoverId != null ? 'grab' : 'default';
+      try { canvas.releasePointerCapture(e.pointerId); } catch (err) { }
+      return;
+    }
+    // 空白处轻点：附近的鱼朝该处游去
+    for (const [, s] of sims) {
+      if (Math.random() > 0.6) { s.tx = x; s.ty = y; s.hold = 0; }
+    }
+  }
+
+  canvas.addEventListener('pointerup', endDrag);
+  canvas.addEventListener('pointercancel', (e) => {
+    drag = null;
+    canvas.style.cursor = 'default';
+    try { canvas.releasePointerCapture(e.pointerId); } catch (err) { }
+  });
+  canvas.addEventListener('pointerleave', () => {
+    if (drag) return;
+    hoverId = null;
+    canvas.style.cursor = 'default';
   });
 
   function hitTest(mx, my) {
