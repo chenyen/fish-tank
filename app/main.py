@@ -26,6 +26,7 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 _lock = threading.Lock()
 
 DEFAULT_NAMES = ["小豆", "团子", "泡芙", "布丁", "糯米", "麦芽", "橙子", "雪球"]
+DEFAULT_TITLE = "AQUARIUM"
 
 
 # ---------------------------------------------------------------- 认证工具
@@ -113,6 +114,21 @@ def save_world(conn, tank: dict, fish_list: list) -> None:
     conn.commit()
 
 
+def tank_title(conn, tank_id: int) -> str:
+    row = conn.execute("SELECT title FROM tank_meta WHERE tank_id=?", (tank_id,)).fetchone()
+    return row["title"] if row else DEFAULT_TITLE
+
+
+def clean_name(raw: str, label: str, max_len: int) -> str:
+    """名字允许任意字符，只去掉换行与首尾空白，长度 1..max_len。"""
+    s = (raw or "").replace("\r", " ").replace("\n", " ").strip()
+    if not s:
+        raise HTTPException(400, f"{label}不能为空")
+    if len(s) > max_len:
+        raise HTTPException(400, f"{label}最多 {max_len} 个字符")
+    return s
+
+
 def advance(conn, user_id: int):
     """载入、推进时间、返回 (tank, fish_list, 产出摘要)"""
     tank = get_tank(conn, user_id)
@@ -122,7 +138,7 @@ def advance(conn, user_id: int):
     return tank, fish_list, gain
 
 
-def serialize(tank: dict, fish_list: list, gain: dict) -> dict:
+def serialize(tank: dict, fish_list: list, gain: dict, title: str = DEFAULT_TITLE) -> dict:
     now = time.time()
     fish_out = []
     for f in fish_list:
@@ -146,6 +162,7 @@ def serialize(tank: dict, fish_list: list, gain: dict) -> dict:
     if food < game.FOOD_CAP:
         next_food_in = max(0, int(game.FOOD_REGEN_SEC - tank["food_acc"]))
     return {
+        "title": title,
         "coins": int(tank["coins"]),
         "coins_exact": round(tank["coins"], 2),
         "pending": round(tank["pending"], 2),
@@ -184,6 +201,15 @@ class FishCreate(BaseModel):
 
 class FeedReq(BaseModel):
     fish_id: int
+
+
+class TitleReq(BaseModel):
+    title: str = ""
+
+
+class FishRename(BaseModel):
+    fish_id: int
+    name: str = ""
 
 
 # ---------------------------------------------------------------- 路由
@@ -257,7 +283,7 @@ def state(request: Request):
     with _lock, db.session() as conn:
         user = current_user(request, conn)
         tank, fish_list, gain = advance(conn, user["id"])
-        data = serialize(tank, fish_list, gain)
+        data = serialize(tank, fish_list, gain, tank_title(conn, tank["id"]))
     data["username"] = user["username"]
     return data
 
@@ -279,7 +305,39 @@ def add_fish(body: FishCreate, request: Request):
         )
         save_world(conn, tank, fish_list)
         fish_list = get_fish(conn, tank["id"])
-        return serialize(tank, fish_list, gain)
+        return serialize(tank, fish_list, gain, tank_title(conn, tank["id"]))
+
+
+@app.post("/api/title")
+def rename_tank(body: TitleReq, request: Request):
+    """改鱼缸名（顶部标题），任意字符。"""
+    title = clean_name(body.title, "鱼缸名", 24)
+    with _lock, db.session() as conn:
+        user = current_user(request, conn)
+        tank, fish_list, gain = advance(conn, user["id"])
+        conn.execute(
+            "INSERT INTO tank_meta(tank_id, title) VALUES(?,?) "
+            "ON CONFLICT(tank_id) DO UPDATE SET title=excluded.title",
+            (tank["id"], title),
+        )
+        conn.commit()
+        return serialize(tank, fish_list, gain, title)
+
+
+@app.post("/api/fish/name")
+def rename_fish(body: FishRename, request: Request):
+    """给单条鱼改名，任意字符。"""
+    name = clean_name(body.name, "鱼名", 16)
+    with _lock, db.session() as conn:
+        user = current_user(request, conn)
+        tank, fish_list, gain = advance(conn, user["id"])
+        target = next((f for f in fish_list if f["id"] == body.fish_id), None)
+        if not target:
+            raise HTTPException(404, "这条鱼不在你的鱼缸里")
+        conn.execute("UPDATE fish SET name=? WHERE id=?", (name, body.fish_id))
+        conn.commit()
+        fish_list = get_fish(conn, tank["id"])
+        return serialize(tank, fish_list, gain, tank_title(conn, tank["id"]))
 
 
 @app.post("/api/feed")
@@ -297,7 +355,7 @@ def feed(body: FeedReq, request: Request):
         tank["food"] -= 1
         target["hunger"] = min(100.0, target["hunger"] + game.FEED_AMOUNT)
         save_world(conn, tank, fish_list)
-        return serialize(tank, fish_list, gain)
+        return serialize(tank, fish_list, gain, tank_title(conn, tank["id"]))
 
 
 @app.post("/api/food")
@@ -316,7 +374,7 @@ def buy_food(request: Request):
         tank["coins"] -= game.FOOD_PACK_PRICE
         tank["food"] = min(game.FOOD_CAP, tank["food"] + game.FOOD_PACK)
         save_world(conn, tank, fish_list)
-        return serialize(tank, fish_list, gain)
+        return serialize(tank, fish_list, gain, tank_title(conn, tank["id"]))
 
 
 @app.get("/api/leaderboard")

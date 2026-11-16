@@ -36,6 +36,11 @@ CREATE TABLE IF NOT EXISTS fish (
     FOREIGN KEY (tank_id) REFERENCES tanks(id)
 );
 
+CREATE TABLE IF NOT EXISTS tank_meta (
+    tank_id INTEGER PRIMARY KEY,
+    title   TEXT NOT NULL,
+    FOREIGN KEY (tank_id) REFERENCES tanks(id)
+);
 CREATE INDEX IF NOT EXISTS idx_fish_tank ON fish(tank_id);
 """
 

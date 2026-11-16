@@ -361,3 +361,33 @@ canvas { display: block; width: 100%; height: 100%; cursor: default; touch-actio
   .dock .btn { min-width: 0; flex: 1; font-size: 13px; padding: 11px 8px; }
   .brand { display: none; }
 }
+
+
+/* ---------------------------------------------------------------- 改名交互（点击标题 / 点击鱼名） */
+
+.brand { cursor: pointer; transition: color .18s, text-shadow .18s; }
+.brand:hover { color: #ffffff; text-shadow: 0 0 10px rgba(75, 224, 200, .6); }
+
+input.renaming {
+  font: inherit;
+  color: #eafffb;
+  background: rgba(4, 20, 26, .88);
+  border: 1px solid rgba(75, 224, 200, .65);
+  border-radius: 6px;
+  padding: 1px 7px;
+  outline: none;
+  min-width: 90px;
+  max-width: 200px;
+}
+
+.brand input.renaming { font-size: 14px; letter-spacing: 1px; }
+
+.fishitem .fname {
+  cursor: pointer;
+  padding: 0 2px;
+  border-bottom: 1px dashed rgba(75, 224, 200, .35);
+  border-radius: 3px;
+  transition: color .18s, background .18s;
+}
+.fishitem .fname:hover { color: var(--aqua); background: rgba(75, 224, 200, .14); }
+.fishitem .fname input.renaming { max-width: 110px; }

@@ -128,6 +128,8 @@
     $('#food').textContent = data.food;
     $('#foodMax').textContent = '/' + data.food_cap;
     $('#who').textContent = data.username || '';
+    const brandEl = $('#brandTitle');
+    if (brandEl && !editingNode) brandEl.textContent = data.title || 'AQUARIUM';
 
     clockBase = data.next_payout_in || 0;
     clockSyncAt = Date.now();
@@ -151,7 +153,7 @@
     }
     for (const id of [...sims.keys()]) if (!seen.has(id)) sims.delete(id);
 
-    renderList(data);
+    if (!editingNode) renderList(data);
 
     const free = data.capacity - data.fish.length;
     $('#btnFish').textContent = free > 0
@@ -201,7 +203,7 @@
       const growPct = Math.round(f.stage.progress * 100);
       const ageH = (f.age / 3600).toFixed(1);
       return `<div class="fishitem" data-id="${f.id}" title="点击喂食">
-        <div class="top"><b>${esc(f.name)}</b><span class="stag">${f.stage.name}</span></div>
+        <div class="top"><b class="fname" data-id="${f.id}" title="点击给这条鱼改名">${esc(f.name)}</b><span class="stag">${f.stage.name}</span></div>
         <div class="bar grow"><i style="width:${growPct}%"></i></div>
         <div class="bar hunger"><i style="width:${hunger}%"></i></div>
         <div class="meta"><span>${f.coin_rate} 币/时${f.eff < 1 ? ' · 产能 ' + Math.round(f.eff * 100) + '%' : ''}</span><span>已养 ${ageH}h</span></div>
@@ -210,13 +212,99 @@
     }).join('');
 
     box.querySelectorAll('.fishitem').forEach((el) => {
-      el.onclick = () => feed(+el.dataset.id);
+      el.onclick = (ev) => {
+        const nameEl = ev.target.closest('.fname');
+        if (nameEl) {
+          ev.stopPropagation();
+          renameFish(+nameEl.dataset.id, nameEl);
+          return;
+        }
+        feed(+el.dataset.id);
+      };
     });
   }
 
   function esc(s) {
     return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   }
+
+  /* ------------------------------------------------------------ 改名 */
+
+  let editingNode = null;          // 正在编辑的元素，编辑期间不重建列表
+
+  function inlineEdit(el, value, maxLen, onCommit) {
+    if (!el || editingNode) return;
+    editingNode = el;
+    const prev = el.textContent;
+    el.classList.add('editing');
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'renaming';
+    input.maxLength = maxLen;
+    input.value = value == null ? prev : value;
+    el.textContent = '';
+    el.appendChild(input);
+    input.focus();
+    input.select();
+
+    let done = false;
+    const finish = (commit) => {
+      if (done) return;
+      done = true;
+      const val = input.value;
+      el.classList.remove('editing');
+      el.textContent = prev;
+      editingNode = null;
+      if (commit) onCommit(val);
+    };
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+      else if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+      e.stopPropagation();
+    });
+    input.addEventListener('blur', () => finish(true));
+    input.addEventListener('pointerdown', (e) => e.stopPropagation());
+    input.addEventListener('click', (e) => e.stopPropagation());
+    input.addEventListener('dblclick', (e) => e.stopPropagation());
+  }
+
+  function editTankTitle() {
+    const el = $('#brandTitle');
+    if (!el || editingNode) return;
+    const cur = (state && state.title) || el.textContent;
+    inlineEdit(el, cur, 24, async (val) => {
+      const title = val.replace(/[\r\n]/g, ' ').trim();
+      if (!title) { toast('鱼缸名不能为空'); return; }
+      if (state && title === state.title) return;
+      try {
+        const data = await api('/api/title', 'POST', { title });
+        applyState(data);
+        toast('鱼缸名已改为「' + data.title + '」');
+      } catch (e) {
+        toast(e.message, 1800);
+      }
+    });
+  }
+
+  function renameFish(id, nameEl) {
+    const f = state && state.fish.find((x) => x.id === id);
+    if (!f || editingNode) return;
+    const el = nameEl || $('#fishList').querySelector('.fishitem[data-id="' + id + '"] .fname');
+    inlineEdit(el, f.name, 16, async (val) => {
+      const name = val.replace(/[\r\n]/g, ' ').trim();
+      if (!name) { toast('鱼名不能为空'); return; }
+      if (name === f.name) return;
+      try {
+        const data = await api('/api/fish/name', 'POST', { fish_id: id, name });
+        applyState(data);
+        toast('它叫「' + name + '」了');
+      } catch (e) {
+        toast(e.message, 1800);
+      }
+    });
+  }
+
+  $('#brandTitle').onclick = () => editTankTitle();
 
   /* ------------------------------------------------------------ 操作 */
 

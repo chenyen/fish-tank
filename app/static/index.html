@@ -36,7 +36,7 @@
 <!-- 游戏 -->
 <section id="game" class="screen hidden">
   <header>
-    <span class="brand">AQUARIUM</span>
+    <span class="brand" id="brandTitle" title="点击修改鱼缸名">AQUARIUM</span>
     <span class="pill gold" title="已入账金币"><span>🪙</span><b id="coins">0</b><i id="pending">+0.0</i></span>
     <span class="pill clock" title="下次整点结算倒计时"><span>⏳</span><b id="clock">--:--</b></span>
     <span class="pill feed"><span>🌾</span><b id="food">0</b><span id="foodMax">/10</span></span>
@@ -50,11 +50,11 @@
     <div id="toast"></div>
     <aside id="panel">
       <h3>我的鱼 · <span id="income">0</span> 币/时</h3>
-      <div class="panelhint">点击卡片喂食</div>
+      <div class="panelhint">点卡片喂食 · 点鱼名改名</div>
       <div id="fishList"></div>
       <div id="foodTimer" class="empty"></div>
     </aside>
-    <div id="tip">按住鱼可拖动位置 · 喂食请点右侧「我的鱼」· 金币整点结算</div>
+    <div id="tip">按住鱼可拖动位置 · 点顶部标题可改鱼缸名 · 喂食请点右侧「我的鱼」</div>
   </div>
 
   <div class="dock">
