@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>虚拟养鱼</title>
+<link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+
+<!-- 登录 / 注册 -->
+<section id="auth" class="screen">
+  <div class="card">
+    <h1>虚拟养鱼</h1>
+    <p class="sub">喂食、长大、产金币 —— 离线也在成长</p>
+
+    <div class="tabs">
+      <button id="tabLogin" class="on">登录</button>
+      <button id="tabReg">注册</button>
+    </div>
+
+    <div class="field">
+      <label>用户名</label>
+      <input id="username" type="text" maxlength="20" placeholder="2-20 个字符" autocomplete="username" />
+    </div>
+    <div class="field">
+      <label>密码</label>
+      <input id="password" type="password" maxlength="64" placeholder="至少 4 位" autocomplete="current-password" />
+    </div>
+
+    <button id="submitAuth" class="btn full">进入鱼缸</button>
+    <div id="authHint" class="hint"></div>
+  </div>
+</section>
+
+<!-- 游戏 -->
+<section id="game" class="screen hidden">
+  <header>
+    <span class="brand">AQUARIUM</span>
+    <span class="pill gold" title="已入账金币"><span>🪙</span><b id="coins">0</b><i id="pending">+0.0</i></span>
+    <span class="pill clock" title="下次整点结算倒计时"><span>⏳</span><b id="clock">--:--</b></span>
+    <span class="pill feed"><span>🌾</span><b id="food">0</b><span id="foodMax">/10</span></span>
+    <span class="spacer"></span>
+    <span id="who"></span>
+    <button id="logout" class="btn ghost small">退出</button>
+  </header>
+
+  <div id="stageWrap">
+    <canvas id="tank"></canvas>
+    <div id="toast"></div>
+    <aside id="panel">
+      <h3>我的鱼 · <span id="income">0</span> 币/时</h3>
+      <div id="fishList"></div>
+      <div id="foodTimer" class="empty"></div>
+    </aside>
+    <div id="tip">点击鱼喂食 · 金币每小时整点结算一次</div>
+  </div>
+
+  <div class="dock">
+    <button id="btnFish" class="btn">买一条鱼 · 20</button>
+    <button id="btnFood" class="btn ghost">换饲料 x5 · 8</button>
+    <button id="btnBoard" class="btn ghost">排行榜</button>
+  </div>
+</section>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+services:
+  web:
+    build: .
+    image: fish-tank:1.0
+    container_name: fish-tank
+    restart: unless-stopped
+    ports:
+      - "8848:8000"
+    volumes:
+      - ./data:/data
+    environment:
+      DB_PATH: /data/tank.db
+      FT_SECRET: "a7f3c9d1e5b84f26a0c7d3e9b1f5842ce6d0a9b7c3f1e5d284a6b0c9e7f3d1a5"
+      TZ: Asia/Shanghai
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/api/me').read()"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
