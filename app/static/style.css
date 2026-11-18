@@ -1,12 +1,165 @@
+﻿/* ============================================================================
+   虚拟养鱼 - 前台样式
+   配色全部走 CSS 变量，两套主题：
+     html[data-theme="deep"]    经典深海（默认，深色）
+     html[data-theme="cartoon"] 明亮卡通（浅色、深描边、硬阴影、糖果色）
+   canvas 水体与鱼的配色也由这里的 --water-* / --fish-* 变量驱动（app.js 读取）。
+   ============================================================================ */
+
 :root {
-  --deep: #06202e;
-  --deep2: #0b3245;
-  --glass: rgba(255, 255, 255, 0.08);
-  --line: rgba(255, 255, 255, 0.14);
+  color-scheme: dark;
+
+  /* ---- 背景与表面 ---- */
+  --bg: #06202e;
+  --bg-grad: radial-gradient(120% 90% at 50% 0%, #12506b 0%, #0b3245 45%, #06202e 100%);
+  --surface: rgba(4, 24, 34, .72);
+  --surface-2: rgba(255, 255, 255, .04);
+  --surface-3: rgba(0, 0, 0, .28);
+  --card-bg: rgba(255, 255, 255, .08);
+  --overlay-bg: rgba(3, 16, 24, .68);
+  --toast-bg: rgba(6, 32, 46, .92);
+  --input-bg: rgba(0, 0, 0, .25);
+  --input-ink: #eafffb;
+  --rename-bg: rgba(4, 20, 26, .9);
+  --row-bg: rgba(255, 255, 255, .04);
+  --species-bg: linear-gradient(160deg, rgba(24, 64, 78, .72), rgba(12, 34, 44, .82));
+  --species-line: rgba(120, 214, 214, .22);
+
+  /* ---- 描边与文字 ---- */
+  --line: rgba(255, 255, 255, .14);
+  --line-soft: rgba(255, 255, 255, .12);
   --text: #e9f6ff;
+  --text-strong: #bff3ea;
   --muted: #8fb3c7;
+  --muted-2: #7fa0b3;
+  --muted-3: rgba(143, 179, 199, .8);
+  --brand-ink: #bff3ea;
+
+  /* ---- 强调色 ---- */
+  --accent: #4be0c8;
+  --accent-2: #7ee8ff;
+  --accent-rgb: 75, 224, 200;
+  --accent-ink: #06202e;
   --gold: #ffcc4d;
-  --aqua: #4be0c8;
+  --gold-2: #ff9d5c;
+  --gold-ink: #ffd97a;
+  --pill-clock: #9fd8ff;
+  --arrow: #79f2df;
+  --arrow-hover: #ffffff;
+
+  /* ---- 形状与阴影 ---- */
+  --bw: 1px;
+  --radius-lg: 22px;
+  --radius-md: 16px;
+  --radius-sm: 12px;
+  --radius-pill: 999px;
+  --card-shadow: 0 24px 60px rgba(0, 0, 0, .35);
+  --panel-shadow: 0 18px 40px rgba(0, 0, 0, .28);
+  --hard-shadow: none;
+
+  /* ---- 控件 ---- */
+  --btn-bg: linear-gradient(180deg, #6ef0d6, var(--accent));
+  --btn-text: #06202e;
+  --ghost-bg: transparent;
+  --track: rgba(255, 255, 255, .12);
+  --scroll-track: rgba(255, 255, 255, .05);
+  --scroll-thumb: rgba(75, 224, 200, .38);
+  --scroll-thumb-hover: rgba(75, 224, 200, .68);
+  --panel-head-hover: rgba(75, 224, 200, .07);
+
+  /* ---- Canvas 水体与鱼（app.js 读取这两个分组）---- */
+  --water-top: #14607f;
+  --water-mid: #0c3f58;
+  --water-bot: #06202e;
+  --beam: rgba(140, 235, 255, .10);
+  --beam-fade: rgba(140, 235, 255, 0);
+  --bubble-stroke: rgba(200, 240, 255, .28);
+  --bubble-fill: rgba(200, 245, 255, .85);
+  --plant-a: rgba(40, 150, 120, .45);
+  --plant-b: rgba(30, 120, 100, .38);
+  --sand-a: rgba(30, 70, 88, 0);
+  --sand-b: rgba(12, 40, 54, .95);
+  --fish-sat-k: 1;
+  --fish-light-k: 1;
+  --fish-ink-w: 1;
+  --fish-ink: rgba(18, 44, 58, .3);
+  --fish-shadow: #00131c;
+}
+
+/* ---------------------------------------------------------------------------
+   明亮卡通：浅色明亮渐变背景、白色/奶油色面板、深色描边 + 硬阴影、大圆角、糖果色按钮
+   --------------------------------------------------------------------------- */
+html[data-theme="cartoon"] {
+  color-scheme: light;
+
+  --bg: #e4f4fc;
+  --bg-grad: radial-gradient(120% 90% at 50% 0%, #d4f0fc 0%, #eaf7fd 48%, #e4f4fc 100%);
+  --surface: #ffffff;
+  --surface-2: #fff9ec;
+  --surface-3: #eef8ff;
+  --card-bg: #ffffff;
+  --overlay-bg: rgba(23, 57, 79, .46);
+  --toast-bg: #ffffff;
+  --input-bg: #f4fbff;
+  --input-ink: #14313f;
+  --rename-bg: #ffffff;
+  --row-bg: #f4fbff;
+  --species-bg: linear-gradient(160deg, #ffffff, #eefaff);
+  --species-line: #8fc6d9;
+
+  --line: #4a6b7d;
+  --line-soft: #a8cddc;
+  --text: #14313f;
+  --text-strong: #0f2b3a;
+  --muted: #527286;
+  --muted-2: #6b8b9c;
+  --muted-3: rgba(80, 112, 132, .85);
+  --brand-ink: #0f2b3a;
+
+  --accent: #ff9f1c;
+  --accent-2: #ffd166;
+  --accent-rgb: 255, 159, 28;
+  --accent-ink: #3a2200;
+  --gold: #ef9a00;
+  --gold-2: #ff7b54;
+  --gold-ink: #c26a00;
+  --pill-clock: #0b74a8;
+  --arrow: #ff8a1f;
+  --arrow-hover: #d0490a;
+
+  --bw: 1px;
+  --radius-lg: 26px;
+  --radius-md: 20px;
+  --radius-sm: 14px;
+  --card-shadow: 4px 4px 0 rgba(23, 57, 79, .45);
+  --panel-shadow: 3px 3px 0 rgba(23, 57, 79, .4);
+  --hard-shadow: 0 1px 0 rgba(23, 57, 79, .35);
+
+  --btn-bg: linear-gradient(180deg, #ffd166, #ffa41b);
+  --btn-text: #3a2200;
+  --ghost-bg: #ffffff;
+  --track: rgba(23, 57, 79, .14);
+  --scroll-track: rgba(23, 57, 79, .1);
+  --scroll-thumb: rgba(255, 159, 28, .5);
+  --scroll-thumb-hover: rgba(255, 159, 28, .85);
+  --panel-head-hover: rgba(255, 159, 28, .14);
+
+  --water-top: #d9f2fd;
+  --water-mid: #7ccdee;
+  --water-bot: #35a3d2;
+  --beam: rgba(255, 255, 255, .38);
+  --beam-fade: rgba(255, 255, 255, 0);
+  --bubble-stroke: rgba(255, 255, 255, .82);
+  --bubble-fill: rgba(255, 255, 255, .92);
+  --plant-a: rgba(46, 196, 122, .8);
+  --plant-b: rgba(28, 156, 106, .66);
+  --sand-a: rgba(53, 163, 210, 0);
+  --sand-b: rgba(24, 120, 166, .9);
+  --fish-sat-k: 1.28;
+  --fish-light-k: 1;
+  --fish-ink-w: 1.2;
+  --fish-ink: rgba(16, 44, 66, .8);
+  --fish-shadow: #14455f;
 }
 
 * { box-sizing: border-box; }
@@ -16,8 +169,10 @@ html, body {
   height: 100%;
   font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
   color: var(--text);
-  background: radial-gradient(120% 90% at 50% 0%, #12506b 0%, var(--deep2) 45%, var(--deep) 100%);
+  background: var(--bg);
+  background-image: var(--bg-grad);
   overflow: hidden;
+  transition: background-color .25s ease, color .25s ease;
 }
 
 .hidden { display: none !important; }
@@ -34,12 +189,12 @@ html, body {
 .card {
   width: 100%;
   max-width: 380px;
-  background: var(--glass);
-  border: 1px solid var(--line);
-  border-radius: 22px;
+  background: var(--card-bg);
+  border: var(--bw) solid var(--line);
+  border-radius: var(--radius-lg);
   padding: 30px 26px;
   backdrop-filter: blur(14px);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+  box-shadow: var(--card-shadow);
 }
 
 .card h1 {
@@ -53,6 +208,17 @@ html, body {
   color: var(--muted);
   font-size: 13px;
 }
+
+.adminLink {
+  display: block;
+  margin-top: 14px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.adminLink:hover { color: var(--accent); }
 
 .field {
   margin-bottom: 12px;
@@ -69,9 +235,9 @@ html, body {
 input[type="text"], input[type="password"] {
   width: 100%;
   padding: 12px 14px;
-  border-radius: 12px;
-  border: 1px solid var(--line);
-  background: rgba(0, 0, 0, 0.25);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line-soft);
+  background: var(--input-bg);
   color: var(--text);
   font-size: 15px;
   outline: none;
@@ -79,20 +245,22 @@ input[type="text"], input[type="password"] {
 }
 
 input:focus {
-  border-color: var(--aqua);
-  box-shadow: 0 0 0 3px rgba(75, 224, 200, .15);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), .15);
 }
 
 .btn {
-  border: 0;
-  border-radius: 12px;
+  border: var(--bw) solid transparent;
+  border-radius: var(--radius-sm);
   padding: 12px 18px;
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;
-  transition: transform .12s, filter .2s, opacity .2s;
-  color: #06202e;
-  background: linear-gradient(180deg, #6ef0d6, var(--aqua));
+  transition: transform .12s, filter .2s, opacity .2s, background .18s, border-color .18s, color .18s;
+  color: var(--btn-text);
+  background: var(--btn-bg);
+  box-shadow: var(--hard-shadow);
+  font-family: inherit;
 }
 
 .btn:hover { filter: brightness(1.06); }
@@ -100,7 +268,7 @@ input:focus {
 .btn[disabled] { opacity: .45; cursor: not-allowed; transform: none; }
 
 .btn.ghost {
-  background: transparent;
+  background: var(--ghost-bg);
   border: 1px solid var(--line);
   color: var(--text);
 }
@@ -123,14 +291,14 @@ input:focus {
   min-height: 16px;
 }
 
-.hint.error { color: #ff8f8f; }
+.hint.error { color: #ff6f6f; }
 
 .tabs {
   display: flex;
   gap: 6px;
-  background: rgba(0, 0, 0, .22);
+  background: var(--surface-3);
   padding: 4px;
-  border-radius: 12px;
+  border-radius: var(--radius-sm);
   margin-bottom: 18px;
 }
 
@@ -143,11 +311,13 @@ input:focus {
   border-radius: 9px;
   cursor: pointer;
   font-size: 14px;
+  font-family: inherit;
 }
 
 .tabs button.on {
-  background: rgba(75, 224, 200, .16);
+  background: rgba(var(--accent-rgb), .16);
   color: var(--text);
+  font-weight: 600;
 }
 
 /* ---------------- 游戏 ---------------- */
@@ -161,66 +331,215 @@ header {
   align-items: center;
   gap: 10px;
   padding: 12px 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, .07);
+  border-bottom: 1px solid var(--line-soft);
   z-index: 3;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
+
+header::-webkit-scrollbar { display: none; }
+
+/* 打开风格菜单时放开 overflow-x:auto 对下拉菜单的裁剪，并提升层级避免被右侧面板盖住 */
+header.menu-open { overflow: visible; z-index: 25; }
 
 .brand {
   font-weight: 700;
   letter-spacing: 2px;
   font-size: 15px;
-  color: #bff3ea;
+  color: var(--brand-ink);
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .pill {
   display: flex;
   align-items: center;
   gap: 6px;
-  background: rgba(0, 0, 0, .28);
-  border: 1px solid var(--line);
-  border-radius: 999px;
+  background: var(--surface-3);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-pill);
   padding: 6px 13px;
   font-size: 14px;
   font-variant-numeric: tabular-nums;
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .pill.gold { color: var(--gold); }
 
+.pillIcon {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  display: block;
+}
+
+.coinIcon .coinBody { fill: currentColor; }
+.coinIcon .coinRing,
+.coinIcon .coinMark {
+  fill: none;
+  stroke: #5a3a00;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.coinIcon .coinRing { stroke-width: 1.1; opacity: .7; }
+.coinIcon .coinMark { stroke-width: 1.9; }
+
+.feedIcon .stalk {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+.feedIcon .grain { fill: currentColor; opacity: .95; }
+
 .pill.gold i {
   font-style: normal;
   font-size: 12px;
-  color: #ffd97a;
+  color: var(--gold-ink);
   opacity: .8;
   margin-left: 2px;
   font-variant-numeric: tabular-nums;
 }
 
-.pill.clock { color: #9fd8ff; font-size: 13px; font-variant-numeric: tabular-nums; }
 
 .pill.pop { animation: pillPop .45s ease; }
 
 @keyframes pillPop {
   0% { transform: scale(1); }
-  35% { transform: scale(1.13); box-shadow: 0 0 0 4px rgba(255, 204, 77, .18); }
+  35% { transform: scale(1.13); box-shadow: 0 0 0 4px rgba(var(--accent-rgb), .2); }
   100% { transform: scale(1); }
 }
-.pill.feed { color: var(--aqua); }
+.pill.feed { color: var(--accent); }
 
 .spacer { flex: 1; }
 
-#who {
-  font-size: 13px;
+/* ---------------- 顶栏用户名 + 风格菜单 ---------------- */
+.userMenu { position: relative; flex: 0 0 auto; }
+
+.userBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 120px;
+  height: 28px;
+  padding: 0 8px 0 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid transparent;
+  background: transparent;
   color: var(--muted);
-  max-width: 90px;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: color .18s, background .18s, border-color .18s;
+}
+
+.userBtn:hover,
+.userMenu.open .userBtn {
+  color: var(--text);
+  background: rgba(var(--accent-rgb), .12);
+  border-color: rgba(var(--accent-rgb), .42);
+}
+
+.userBtn .caret {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: .75;
+  transition: transform .2s;
+}
+
+.userMenu.open .userBtn .caret { transform: rotate(180deg); }
+
+#who {
+  max-width: 92px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.themeMenu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  min-width: 178px;
+  padding: 6px;
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--card-shadow);
+  backdrop-filter: blur(14px);
+  z-index: 20;
+}
+
+.themeMenuTitle {
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: var(--muted);
+  padding: 6px 8px 8px;
+}
+
+.themeItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: background .16s, color .16s;
+}
+
+.themeItem:hover { background: rgba(var(--accent-rgb), .14); }
+
+.themeItem .tx { flex: 1 1 auto; }
+
+.themeItem .sw {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  border-radius: 6px;
+  border: 1px solid var(--line-soft);
+}
+
+.sw-deep { background: linear-gradient(160deg, #12506b, #06202e); }
+.sw-cartoon { background: linear-gradient(160deg, #ffe1a8, #7fd8f5); }
+
+.themeItem .tick {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0;
+  transition: opacity .16s;
+}
+
+.themeItem.on { background: rgba(var(--accent-rgb), .16); font-weight: 700; }
+.themeItem.on .tick { opacity: 1; }
+
 .btn.small {
   padding: 7px 14px;
   font-size: 13px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
 }
 
 #stageWrap {
@@ -236,39 +555,111 @@ canvas { display: block; width: 100%; height: 100%; cursor: default; touch-actio
   left: 50%;
   top: 18px;
   transform: translateX(-50%) translateY(-14px);
-  background: rgba(6, 32, 46, .9);
+  background: var(--toast-bg);
   border: 1px solid var(--line);
   color: var(--text);
   padding: 9px 16px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-size: 13px;
   opacity: 0;
   transition: all .28s ease;
   pointer-events: none;
   white-space: nowrap;
   z-index: 6;
+  box-shadow: var(--panel-shadow);
 }
 
 #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-/* 侧栏 */
+/* ---------------- 侧栏 ---------------- */
 #panel {
   position: absolute;
   right: 14px;
   top: 14px;
-  width: 250px;
+  width: 348px;
   max-height: calc(100% - 28px);
-  overflow: auto;
-  background: rgba(4, 24, 34, .72);
-  border: 1px solid var(--line);
-  border-radius: 16px;
+  background: var(--surface);
+  border: var(--bw) solid var(--line);
+  border-radius: var(--radius-md);
   padding: 14px;
   backdrop-filter: blur(10px);
+  box-shadow: var(--panel-shadow);
   z-index: 4;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   transition: transform .25s, opacity .25s;
 }
 
 #panel.off { transform: translateX(120%); opacity: 0; pointer-events: none; }
+
+/* ---------------- 「我的鱼」列表：自定义滚动条 ----------------
+   1) 面板纵向 flex 且隐藏自身滚动，滚动交给内部 #fishList，滚动条不会压住圆角边框；
+   2) Chromium 用 ::-webkit-scrollbar 系列伪元素；
+   3) Firefox 用标准属性 scrollbar-width / scrollbar-color。 */
+#fishList {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scroll-thumb) var(--scroll-track);
+}
+
+#fishList::-webkit-scrollbar { width: 6px; height: 6px; }
+
+#fishList::-webkit-scrollbar-track {
+  background: var(--scroll-track);
+  border-radius: var(--radius-pill);
+}
+
+#fishList::-webkit-scrollbar-thumb {
+  background: var(--scroll-thumb);
+  border-radius: var(--radius-pill);
+  border: 1px solid rgba(0, 0, 0, .12);
+  background-clip: padding-box;
+  transition: background .2s;
+}
+
+#fishList::-webkit-scrollbar-thumb:hover { background: var(--scroll-thumb-hover); }
+#fishList::-webkit-scrollbar-thumb:active { background: var(--scroll-thumb-hover); }
+#fishList::-webkit-scrollbar-corner { background: transparent; }
+
+/* 面板里除列表外的元素不参与压缩，保证列表拿到剩余高度 */
+#panel > h3,
+#panel > .panelhint,
+#panel > #foodTimer { flex: 0 0 auto; }
+
+/* 其它需要滚动的位置（鱼苗弹窗、排行榜等）同样去掉原生滚动条 */
+.shopcard,
+#panel .card,
+.overlay .card {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scroll-thumb) var(--scroll-track);
+}
+
+.shopcard::-webkit-scrollbar,
+#panel .card::-webkit-scrollbar,
+.overlay .card::-webkit-scrollbar { width: 6px; height: 6px; }
+
+.shopcard::-webkit-scrollbar-track,
+#panel .card::-webkit-scrollbar-track,
+.overlay .card::-webkit-scrollbar-track {
+  background: var(--scroll-track);
+  border-radius: var(--radius-pill);
+}
+
+.shopcard::-webkit-scrollbar-thumb,
+#panel .card::-webkit-scrollbar-thumb,
+.overlay .card::-webkit-scrollbar-thumb {
+  background: var(--scroll-thumb);
+  border-radius: var(--radius-pill);
+}
+
+.shopcard::-webkit-scrollbar-thumb:hover,
+#panel .card::-webkit-scrollbar-thumb:hover,
+.overlay .card::-webkit-scrollbar-thumb:hover { background: var(--scroll-thumb-hover); }
 
 #panel h3 {
   margin: 0 0 10px;
@@ -278,19 +669,144 @@ canvas { display: block; width: 100%; height: 100%; cursor: default; touch-actio
   font-weight: 600;
 }
 
+/* 「我的鱼」标题行：可点击折叠 / 展开，右侧带鱼数、收益与一键投喂 */
+.panelHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  border-radius: 10px;
+  padding: 2px 2px;
+  font-size: 12.5px;
+  transition: color .18s, background .18s;
+}
+
+.panelHead:hover { color: var(--text-strong); background: var(--panel-head-hover); }
+
+.panelHead .phLeft {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+
+.panelHead .phTitle {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* 折叠箭头：16-18px 加粗上下箭头，点击热区 32×32 */
+.panelHead .foldToggle {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  margin: -6px 1px -6px -4px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background .18s, box-shadow .18s;
+}
+
+.panelHead .foldToggle:hover { background: rgba(var(--accent-rgb), .3); box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), .45); }
+
+.panelHead .foldToggle .foldArrow {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: var(--arrow);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 4px rgba(var(--accent-rgb), .35));
+  transition: transform .24s ease, stroke .18s;
+}
+
+.panelHead .foldToggle:hover .foldArrow { stroke: var(--arrow-hover); }
+
+/* 折叠态：箭头翻转为向下 ▼ */
+#panel.collapsed .foldToggle .foldArrow { transform: rotate(180deg); stroke: var(--arrow); }
+#panel.collapsed .foldToggle:hover .foldArrow { stroke: var(--arrow-hover); }
+
+.panelHead .phRight {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-right: 2px;
+  flex: 0 0 auto;
+}
+
+.panelHead .fishCount {
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--muted-2);
+  white-space: nowrap;
+}
+
+/* 一键投喂：与顶部「退出」同款小号幽灵按钮（高 30px、12px 字号、胶囊、低饱和描边，hover 才提亮） */
+#btnFeedAll.feedAll {
+  height: 30px;
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  border-radius: var(--radius-pill);
+  border: var(--bw) solid var(--line-soft);
+  background: var(--ghost-bg);
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  flex: 0 0 auto;
+  box-shadow: none;
+}
+
+#btnFeedAll.feedAll:hover:not([disabled]) {
+  color: var(--text);
+  border-color: rgba(var(--accent-rgb), .6);
+  background: rgba(var(--accent-rgb), .12);
+  filter: none;
+}
+
+#btnFeedAll.feedAll:active:not([disabled]) { transform: scale(.96); }
+
+#btnFeedAll.feedAll[disabled] { opacity: .45; cursor: not-allowed; }
+
+/* 折叠态：列表、提示、饲料倒计时收起，面板随内容收缩，不留空白 */
+#panel.collapsed .panelhint,
+#panel.collapsed #fishList,
+#panel.collapsed #foodTimer { display: none; }
+
+#panel.collapsed .panelHead { margin-bottom: 0; }
+
 .fishitem {
   padding: 9px 10px;
   border-radius: 11px;
-  background: rgba(255, 255, 255, .04);
+  background: var(--row-bg);
   margin-bottom: 8px;
   cursor: pointer;
   border: 1px solid transparent;
   transition: border-color .2s, background .2s;
 }
 
-.fishitem:hover { border-color: rgba(75, 224, 200, .5); background: rgba(75, 224, 200, .08); }
+.fishitem:hover {
+  border-color: rgba(var(--accent-rgb), .5);
+  background: rgba(var(--accent-rgb), .08);
+}
 
-.panelhint { font-size: 10.5px; color: #7fa0b3; letter-spacing: .3px; margin: -2px 0 8px; opacity: .85; }
+.panelhint { font-size: 10.5px; color: var(--muted-2); letter-spacing: .3px; margin: -2px 0 8px; opacity: .85; }
 
 .fishitem .top {
   display: flex;
@@ -299,12 +815,32 @@ canvas { display: block; width: 100%; height: 100%; cursor: default; touch-actio
   margin-bottom: 6px;
 }
 
-.fishitem .stag { color: var(--aqua); font-size: 11px; }
+.fishitem .stag { color: var(--accent); font-size: 11px; }
+
+.fishitem .topRight { display: flex; align-items: center; gap: 6px; }
+
+/* 成长状态标签：饱满=青绿，正常=中性，缓慢=琥珀，停滞=冷蓝，停止=警示红 */
+.gstate {
+  font-size: 10.5px;
+  line-height: 1.5;
+  padding: 1px 7px;
+  border-radius: var(--radius-pill);
+  font-weight: 600;
+  letter-spacing: .2px;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.gstate.full { color: #2bbf9f; background: rgba(75, 224, 200, .18); border-color: rgba(75, 224, 200, .5); }
+.gstate.normal { color: #5f9bb5; background: rgba(166, 216, 234, .16); border-color: rgba(120, 170, 195, .3); }
+.gstate.low { color: #c98a00; background: rgba(255, 204, 77, .2); border-color: rgba(255, 180, 40, .45); }
+.gstate.stall { color: #4a86d8; background: rgba(127, 180, 255, .18); border-color: rgba(127, 180, 255, .45); }
+.gstate.stop { color: #e05454; background: rgba(255, 128, 128, .18); border-color: rgba(255, 128, 128, .5); }
 
 .bar {
   height: 5px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, .12);
+  border-radius: var(--radius-pill);
+  background: var(--track);
   overflow: hidden;
   margin-bottom: 4px;
 }
@@ -312,11 +848,14 @@ canvas { display: block; width: 100%; height: 100%; cursor: default; touch-actio
 .bar > i {
   display: block;
   height: 100%;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   transition: width .4s;
 }
 
 .bar.grow > i { background: linear-gradient(90deg, #4be0c8, #7ee8ff); }
+.bar.grow.low > i { background: linear-gradient(90deg, #ffcc4d, #ff9d5c); }
+.bar.grow.stall > i { background: linear-gradient(90deg, #7fb4ff, #a9c8ff); }
+.bar.grow.stop > i { background: linear-gradient(90deg, #ff8080, #ffa8a8); }
 .bar.hunger > i { background: linear-gradient(90deg, #ffcc4d, #ff9d5c); }
 
 .meta {
@@ -333,46 +872,88 @@ canvas { display: block; width: 100%; height: 100%; cursor: default; touch-actio
   line-height: 1.7;
 }
 
-/* 底部操作条 */
+/* 顶部操作按钮组（原底部操作条已移入 header，退出按钮左侧） */
 .dock {
   display: flex;
-  gap: 10px;
-  padding: 14px 16px 16px;
-  justify-content: center;
-  border-top: 1px solid rgba(255, 255, 255, .07);
-  background: linear-gradient(180deg, transparent, rgba(0, 0, 0, .28));
-  z-index: 3;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+  flex: 0 0 auto;
 }
 
-.dock .btn { min-width: 116px; }
+.dock .btn {
+  min-width: 0;
+  padding: 7px 13px;
+  font-size: 13px;
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+}
+
+/* 顶部工具栏四个按钮高度与垂直基线统一：
+   .btn 默认无描边，而 .btn.ghost 有描边，会带来高差；
+   这里统一盒模型并固定高度，仅作用于 header 内的 .dock 按钮与退出按钮 */
+header .dock .btn,
+header #logout {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: var(--bw) solid transparent;
+  height: 34px;
+  padding-top: 0;
+  padding-bottom: 0;
+  line-height: 1;
+  vertical-align: middle;
+}
+
+header .dock .btn.ghost { border-color: var(--line); }
 
 #tip {
   position: absolute;
   left: 16px;
   bottom: 12px;
   font-size: 11px;
-  color: rgba(143, 179, 199, .8);
+  color: var(--muted-3);
   z-index: 2;
   pointer-events: none;
 }
 
 @media (max-width: 620px) {
-  #panel { width: 200px; right: 10px; top: 10px; padding: 10px; }
-  .dock .btn { min-width: 0; flex: 1; font-size: 13px; padding: 11px 8px; }
+  /* 窄屏把面板拉宽到接近视口，标题行（箭头 + 标题 + 鱼数 + 一键投喂）保持同一行，按钮与箭头垂直居中 */
+  #panel { width: min(348px, calc(100vw - 20px)); right: 10px; top: 10px; padding: 10px; }
+  header { padding: 10px 9px; gap: 6px; }
+  .pill { padding: 5px 8px; font-size: 12.5px; gap: 4px; }
+  .dock { gap: 5px; }
+  /* 顶部按钮只压缩自身，不挤压标题与金币胶囊，也不换行 */
+  .dock .btn { min-width: 0; flex: 0 0 auto; font-size: 12px; padding: 6px 9px; }
+  .btn.small { padding: 6px 10px; font-size: 12px; }
   .brand { display: none; }
+  /* 窄屏保留用户名入口（风格切换），只压缩宽度 */
+  .userBtn { max-width: 84px; padding: 0 6px 0 8px; font-size: 12px; }
+  #who { max-width: 58px; }
+  /* 窄屏：标题行放不下时整体换行，绝不截断「鱼数 + 收益 + 一键投喂」 */
+  .panelHead { flex-wrap: wrap; row-gap: 4px; }
+  .panelHead .phLeft { flex: 0 0 auto; }
+  .panelHead .phRight { margin-left: auto; }
+  #btnFeedAll.feedAll { height: 30px; padding: 0 10px; font-size: 12px; }
 }
 
+@media (max-width: 430px) {
+  .pill.clock { display: none; }
+  .dock .btn { padding: 6px 8px; }
+  #who { max-width: 48px; }
+}
 
 /* ---------------------------------------------------------------- 改名交互（点击标题 / 点击鱼名） */
 
 .brand { cursor: pointer; transition: color .18s, text-shadow .18s; }
-.brand:hover { color: #ffffff; text-shadow: 0 0 10px rgba(75, 224, 200, .6); }
+.brand:hover { color: var(--accent); text-shadow: 0 0 10px rgba(var(--accent-rgb), .6); }
 
 input.renaming {
   font: inherit;
-  color: #eafffb;
-  background: rgba(4, 20, 26, .88);
-  border: 1px solid rgba(75, 224, 200, .65);
+  color: var(--input-ink);
+  background: var(--rename-bg);
+  border: 1px solid rgba(var(--accent-rgb), .65);
   border-radius: 6px;
   padding: 1px 7px;
   outline: none;
@@ -385,14 +966,14 @@ input.renaming {
 .fishitem .fname {
   cursor: pointer;
   padding: 0 2px;
-  border-bottom: 1px dashed rgba(75, 224, 200, .35);
+  border-bottom: 1px dashed rgba(var(--accent-rgb), .4);
   border-radius: 3px;
   transition: color .18s, background .18s;
 }
-.fishitem .fname:hover { color: var(--aqua); background: rgba(75, 224, 200, .14); }
+.fishitem .fname:hover { color: var(--accent); background: rgba(var(--accent-rgb), .14); }
 .fishitem .fname input.renaming { max-width: 110px; }
 
-/* -------------------------------------------------- 买鱼苗弹窗 */
+/* -------------------------------------------------- 弹窗通用 */
 .overlay {
   position: fixed;
   inset: 0;
@@ -400,11 +981,12 @@ input.renaming {
   align-items: center;
   justify-content: center;
   padding: 20px;
-  background: rgba(3, 16, 24, .68);
+  background: var(--overlay-bg);
   backdrop-filter: blur(4px);
   z-index: 30;
 }
 
+/* -------------------------------------------------- 买鱼苗弹窗 */
 .shopcard {
   width: min(560px, 100%);
   max-width: 560px;
@@ -426,9 +1008,9 @@ input.renaming {
   gap: 4px;
   padding: 12px 12px 14px;
   text-align: left;
-  border-radius: 14px;
-  border: 1px solid rgba(120, 214, 214, .22);
-  background: linear-gradient(160deg, rgba(24, 64, 78, .72), rgba(12, 34, 44, .82));
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--species-line);
+  background: var(--species-bg);
   color: inherit;
   font: inherit;
   cursor: pointer;
@@ -437,8 +1019,13 @@ input.renaming {
 
 .species:hover:not(:disabled) {
   transform: translateY(-2px);
-  border-color: rgba(75, 224, 200, .7);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, .28);
+  border-color: rgba(var(--accent-rgb), .7);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, .22);
+}
+
+.species.picked {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(var(--accent-rgb), .28);
 }
 
 .species.off,
@@ -466,25 +1053,224 @@ input.renaming {
 .species .spPrice {
   font-style: normal;
   font-size: 12px;
-  color: #ffcc4d;
+  color: var(--gold);
   white-space: nowrap;
 }
 
 .species .spDesc {
   font-size: 11.5px;
   line-height: 1.5;
-  color: #8fb3c7;
+  color: var(--muted);
 }
 
 .species .spTag {
   font-size: 11px;
-  color: #4be0c8;
+  color: var(--accent);
 }
 
-.species.off .spTag {
-  color: #ff9a9a;
+.species.off .spTag { color: #e06060; }
+
+/* 卡片底部：左侧标签 + 右下角数量步进器 */
+.species .spFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-top: 2px;
 }
+
+.cardStepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+.cardStep {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: 8px;
+  border: 1px solid var(--line-soft);
+  background: var(--surface-3);
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: background .15s, border-color .15s, transform .1s;
+}
+.cardStep:hover:not(:disabled) { border-color: var(--accent); background: rgba(var(--accent-rgb), .18); }
+.cardStep:active:not(:disabled) { transform: scale(.92); }
+.cardStep:disabled { opacity: .4; cursor: not-allowed; }
+
+.cardQty {
+  min-width: 18px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.species.picked .cardQty { color: var(--accent); }
+
+/* 购买栏：数量步进器 + 合计 + 主按钮 */
+.buyBar {
+  position: sticky;
+  bottom: -4px;
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line-soft);
+  background: var(--surface-2);
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.buyPick {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.buyPick b {
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.buyPick span {
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.stepBtn {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 10px;
+  border: 1px solid var(--line-soft);
+  background: var(--surface-3);
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: background .15s, border-color .15s, transform .1s;
+}
+
+.stepBtn:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: rgba(var(--accent-rgb), .18);
+}
+
+.stepBtn:active:not(:disabled) { transform: scale(.94); }
+.stepBtn:disabled { opacity: .4; cursor: not-allowed; }
+
+#shopQty {
+  width: 58px;
+  height: 32px;
+  padding: 0 2px;
+  text-align: center;
+  border-radius: 10px;
+  border: 1px solid var(--line-soft);
+  background: var(--input-bg);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  outline: none;
+}
+
+#shopQty:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), .15);
+}
+
+.buyTotal {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.buyTotal .sum { color: var(--gold); font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+#shopBuy {
+  grid-column: 1 / -1;
+  width: 100%;
+  height: 40px;
+  padding: 0;
+  font-size: 14px;
+  margin: 0;
+}
+
+.buyHint {
+  grid-column: 1 / -1;
+  font-size: 11.5px;
+  color: var(--muted);
+  min-height: 14px;
+}
+
+.buyHint.warn { color: #e06060; }
 
 @media (max-width: 520px) {
   .speciesGrid { grid-template-columns: 1fr; }
 }
+
+/* -------------------------------------------------- 排行榜 */
+.boardcard {
+  max-width: 420px;
+}
+
+.boardcard h1 { font-size: 19px; }
+
+.boardTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.boardTable thead th {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  text-align: left;
+  padding-bottom: 6px;
+}
+
+.boardTable tbody td {
+  padding: 6px 0;
+  border-top: 1px solid var(--line-soft);
+}
+
+.boardTable th.num { text-align: right; }
+.boardTable td.idx { width: 34px; color: var(--muted); }
+.boardTable td.stage { color: var(--accent); }
+.boardTable td.num { text-align: right; color: var(--gold); font-variant-numeric: tabular-nums; }
+.boardTable .blank { color: var(--muted); text-align: center; padding: 12px 0; }

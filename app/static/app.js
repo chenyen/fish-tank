@@ -13,6 +13,123 @@
   const ctx = canvas.getContext('2d');
   let W = 0, H = 0, DPR = 1;
 
+  /* ------------------------------------------------------------ 界面风格
+     配色全部来自 style.css 的 CSS 变量，切换主题只改 <html data-theme>，
+     canvas 的水体与鱼也读同一套变量（--water-* / --fish-*），保证不撞色。 */
+  const THEME_KEY = 'fishTank.theme';
+  const THEME_LABEL = { deep: '经典深海', cartoon: '明亮卡通' };
+
+  const pal = {
+    waterTop: '#14607f', waterMid: '#0c3f58', waterBot: '#06202e',
+    beam: 'rgba(140,235,255,.10)', beamFade: 'rgba(140,235,255,0)',
+    bubble: 'rgba(200,240,255,.28)', bubbleFill: 'rgba(200,245,255,.85)',
+    plantA: 'rgba(40,150,120,.45)', plantB: 'rgba(30,120,100,.38)',
+    sandA: 'rgba(30,70,88,0)', sandB: 'rgba(12,40,54,.95)',
+    fishInk: 'rgba(18,44,58,.3)', fishShadow: '#00131c',
+    satK: 1, lightK: 1, inkW: 1,
+  };
+
+  function readPalette() {
+    const cs = getComputedStyle(document.documentElement);
+    const str = (name, fb) => {
+      const raw = cs.getPropertyValue(name);
+      return raw && raw.trim() ? raw.trim() : fb;
+    };
+    const num = (name, fb) => {
+      const n = parseFloat(str(name, ''));
+      return Number.isFinite(n) ? n : fb;
+    };
+    pal.waterTop = str('--water-top', pal.waterTop);
+    pal.waterMid = str('--water-mid', pal.waterMid);
+    pal.waterBot = str('--water-bot', pal.waterBot);
+    pal.beam = str('--beam', pal.beam);
+    pal.beamFade = str('--beam-fade', pal.beamFade);
+    pal.bubble = str('--bubble-stroke', pal.bubble);
+    pal.bubbleFill = str('--bubble-fill', pal.bubbleFill);
+    pal.plantA = str('--plant-a', pal.plantA);
+    pal.plantB = str('--plant-b', pal.plantB);
+    pal.sandA = str('--sand-a', pal.sandA);
+    pal.sandB = str('--sand-b', pal.sandB);
+    pal.fishInk = str('--fish-ink', pal.fishInk);
+    pal.fishShadow = str('--fish-shadow', pal.fishShadow);
+    pal.satK = num('--fish-sat-k', 1);
+    pal.lightK = num('--fish-light-k', 1);
+    pal.inkW = num('--fish-ink-w', 1);
+  }
+
+  function currentTheme() {
+    return document.documentElement.dataset.theme === 'cartoon' ? 'cartoon' : 'deep';
+  }
+
+  function syncThemeMenu() {
+    const cur = currentTheme();
+    document.querySelectorAll('.themeItem').forEach((el) => {
+      const on = el.dataset.theme === cur;
+      el.classList.toggle('on', on);
+      el.setAttribute('aria-checked', on ? 'true' : 'false');
+    });
+  }
+
+  function applyTheme(key, remember) {
+    const k = key === 'cartoon' ? 'cartoon' : 'deep';
+    document.documentElement.dataset.theme = k;
+    if (remember) {
+      try { localStorage.setItem(THEME_KEY, k); } catch (e) { }
+    }
+    readPalette();
+    syncThemeMenu();
+  }
+
+  function closeThemeMenu() {
+    const menu = $('#themeMenu');
+    const wrap = $('#userMenu');
+    if (menu) menu.classList.add('hidden');
+    if (wrap) wrap.classList.remove('open');
+    const btn = $('#userBtn');
+    if (btn) btn.setAttribute('aria-expanded', 'false');
+    const hdr = document.querySelector('#game header');
+    if (hdr) hdr.classList.remove('menu-open');
+  }
+
+  function toggleThemeMenu() {
+    const menu = $('#themeMenu');
+    const wrap = $('#userMenu');
+    if (!menu) return;
+    const open = menu.classList.contains('hidden');
+    menu.classList.toggle('hidden', !open);
+    if (wrap) wrap.classList.toggle('open', open);
+    const btn = $('#userBtn');
+    if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    const hdr = document.querySelector('#game header');
+    if (hdr) hdr.classList.toggle('menu-open', open);
+  }
+
+  applyTheme(currentTheme(), false);
+
+  $('#userBtn').onclick = (ev) => {
+    ev.stopPropagation();
+    if (document.querySelector('#shopOverlay') || editingNode) return;
+    toggleThemeMenu();
+  };
+
+  document.querySelectorAll('.themeItem').forEach((el) => {
+    el.onclick = (ev) => {
+      ev.stopPropagation();
+      const k = el.dataset.theme === 'cartoon' ? 'cartoon' : 'deep';
+      const changed = k !== currentTheme();
+      applyTheme(k, true);
+      closeThemeMenu();
+      if (changed) toast('界面风格：' + THEME_LABEL[k], 1600);
+    };
+  });
+
+  document.addEventListener('click', (ev) => {
+    if (!ev.target.closest('#userMenu')) closeThemeMenu();
+  });
+  document.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Escape') closeThemeMenu();
+  });
+
   /* ------------------------------------------------------------ 接口 */
 
   async function api(path, method = 'GET', body = null) {
@@ -116,25 +233,20 @@
     }
   }
 
-  let clockBase = 0;
-  let clockSyncAt = 0;
-
   function applyState(data) {
     const prevCoins = state ? state.coins_exact : null;
     state = data;
     $('#coins').textContent = (data.coins_exact !== undefined ? data.coins_exact : data.coins).toFixed(1);
     $('#pending').textContent = '+' + (data.pending || 0).toFixed(1);
     $('#income').textContent = (data.income_per_hour || 0).toFixed(1);
+    const fcount = $('#fishCount');
+    if (fcount) fcount.textContent = data.fish.length + ' 条';
     $('#food').textContent = data.food;
     const fm = $('#foodMax');           // 饲料不设上限，已无分母
     if (fm) fm.textContent = data.food_cap ? '/' + data.food_cap : '';
     $('#who').textContent = data.username || '';
     const brandEl = $('#brandTitle');
     if (brandEl && !editingNode) brandEl.textContent = data.title || 'AQUARIUM';
-
-    clockBase = data.next_payout_in || 0;
-    clockSyncAt = Date.now();
-    tickClock();
 
     if (prevCoins !== null && data.coins_exact !== prevCoins) {
       const pill = document.querySelector('.pill.gold');
@@ -151,41 +263,35 @@
       const sim = sims.get(f.id);
       // 新鱼，或者鱼种变了（老数据迁移）都重建运动状态
       if (!sim || sim.species !== (f.species || 'carp')) {
-        sims.set(f.id, newSim(f.species));
+        sims.set(f.id, newSim(f.look || f.species));
       }
     }
     for (const id of [...sims.keys()]) if (!seen.has(id)) sims.delete(id);
 
     if (!editingNode) renderList(data);
 
-    const free = data.capacity - data.fish.length;
-    $('#btnFish').textContent = free > 0
-      ? `买鱼苗 · ${data.prices.fish_min} 起`
-      : `鱼缸已满 ${data.fish.length}/${data.capacity}`;
+    const cap = (typeof data.capacity === 'number' && data.capacity > 0) ? data.capacity : null;
+    const free = cap === null ? Infinity : cap - data.fish.length;
+    // 容量为 null 表示后台把上限设为「不限」，此时只按金币判断能否购买
+    $('#btnFish').textContent = free > 0 ? '买鱼苗' : `鱼缸已满 ${data.fish.length}/${cap}`;
     $('#btnFish').disabled = free <= 0;      // 价格随鱼种变化，交给弹窗判断
-    $('#btnFood').textContent = `换饲料 x${data.prices.food_pack_size} · ${data.prices.food_pack}`;
+    $('#btnFood').textContent = '买饲料';
     $('#btnFood').disabled = data.coins < data.prices.food_pack;
 
     const ft = $('#foodTimer');
     ft.textContent = data.next_food_in == null
       ? '饲料不设上限，可以一直囤'
       : `下一份饲料：约 ${Math.ceil(data.next_food_in / 60)} 分钟后（不设上限）`;
-  }
 
-  function tickClock() {
-    const left = Math.max(0, clockBase - (Date.now() - clockSyncAt) / 1000);
-    const m = Math.floor(left / 60);
-    const sec = Math.floor(left % 60);
-    $('#clock').textContent = String(m).padStart(2, '0') + ':' + String(sec).padStart(2, '0');
+    // 买鱼苗弹窗开着时，同步刷新余额 / 空位 / 可买上限
+    if (shopEl) syncShopBar();
   }
-
-  setInterval(() => { if (state) tickClock(); }, 1000);
 
   function notifyGain(gain) {
     if (!gain) return;
     const parts = [];
     if (gain.payout_amount > 0) {
-      parts.push('整点结算 ' + gain.payout_count + ' 小时 +' + gain.payout_amount + ' 金币');
+      parts.push('结算 ' + gain.payout_count + ' 次 +' + gain.payout_amount + ' 金币');
     }
     if (gain.advances && gain.advances.length) {
       const a = gain.advances[0];
@@ -205,12 +311,22 @@
       const hunger = Math.round(f.hunger);
       const growPct = Math.round(f.stage.progress * 100);
       const ageH = (f.age / 3600).toFixed(1);
+      const gs = f.growth_state || { key: 'normal', label: '正常', factor: 1, threshold: 0 };
+      const factorTxt = gs.factor && gs.factor !== 1 ? ` ×${gs.factor}` : '';
+      const rateTxt = f.growth_per_hour ? ` · ${f.growth_per_hour}/时` : '';
+      const gsTip = gs.key === 'stop'
+        ? `饱食低于 ${gs.threshold}%，已停止成长，喂食后即恢复`
+        : `饱食 ≥ ${gs.threshold}% 时成长 ${gs.factor} 倍${
+          gs.next_threshold == null ? '（已是最高档）' : `（饱食到 ${gs.next_threshold}% 可再提速）`}`;
+      const stageTxt = f.stage.next_name
+        ? '距' + f.stage.next_name + ' ' + Math.max(0, Math.round(f.stage.next_at - f.growth))
+        : '已满级';
       return `<div class="fishitem" data-id="${f.id}" title="点击喂食">
-        <div class="top"><b class="fname" data-id="${f.id}" title="点击给这条鱼改名">${esc(f.name)}</b><span class="stag">${esc(f.species_name || '鱼苗')} · ${f.stage.name}</span></div>
-        <div class="bar grow"><i style="width:${growPct}%"></i></div>
+        <div class="top"><b class="fname" data-id="${f.id}" title="点击给这条鱼改名">${esc(f.name)}</b><span class="topRight"><span class="gstate ${gs.key}" title="${esc(gsTip)}">${esc(gs.label)}${factorTxt}</span><span class="stag">${esc(f.species_name || '鱼苗')} · ${f.stage.name}</span></span></div>
+        <div class="bar grow ${gs.key}"><i style="width:${growPct}%"></i></div>
+        <div class="meta"><span>成长 ${growPct}%${rateTxt}</span><span>${stageTxt}</span></div>
         <div class="bar hunger"><i style="width:${hunger}%"></i></div>
-        <div class="meta"><span>${f.coin_rate} 币/时${f.eff < 1 ? ' · 产能 ' + Math.round(f.eff * 100) + '%' : ''}</span><span>已养 ${ageH}h</span></div>
-        <div class="meta"><span>饱食 ${hunger}%</span><span>${f.stage.next_name ? '距' + f.stage.next_name + ' ' + Math.max(0, Math.round(f.stage.next_at - f.growth)) : '已满级'}</span></div>
+        <div class="meta"><span>饱食 ${hunger}% · 已养 ${ageH}h</span><span>${f.coin_rate} 币/时${f.eff < 1 ? ' · 产能 ' + Math.round(f.eff * 100) + '%' : ''}</span></div>
       </div>`;
     }).join('');
 
@@ -326,59 +442,284 @@
 
   $('#btnFish').onclick = () => openShop();
 
+  /* ---------------------------------------------- 「我的鱼」折叠记忆 */
+  const FOLD_KEY = 'fishTank.panelCollapsed';
+
+  function applyFold(collapsed, remember) {
+    const panel = $('#panel');
+    panel.classList.toggle('collapsed', collapsed);
+    // 箭头方向完全交给 CSS（#panel.collapsed 时旋转 180°）：展开 ▲ / 折叠 ▼
+    const tgl = $('#foldToggle');
+    if (tgl) {
+      tgl.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+      tgl.title = collapsed ? '展开我的鱼' : '折叠我的鱼';
+      const head = $('#panelHead');
+      if (head) head.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    }
+    if (remember) {
+      try { localStorage.setItem(FOLD_KEY, collapsed ? '1' : '0'); } catch (e) { }
+    }
+  }
+
+  function restoreFold() {
+    let collapsed = false;
+    try { collapsed = localStorage.getItem(FOLD_KEY) === '1'; } catch (e) { }
+    applyFold(collapsed, false);
+  }
+
+  $('#panelHead').onclick = (ev) => {
+    if (ev.target.closest('#btnFeedAll')) return;   // 一键投喂按钮不触发折叠
+    applyFold(!$('#panel').classList.contains('collapsed'), true);
+  };
+
+  restoreFold();
+
+  /* ---------------------------------------------- 一键投喂（把饱食 <=80% 的鱼喂到 >80%） */
+  async function feedAll() {
+    const btn = $('#btnFeedAll');
+    if (btn.disabled) return;
+    btn.disabled = true;
+    try {
+      const data = await api('/api/feed-all', 'POST', {});
+      applyState(data);
+      const r = data.feed_all || { packs: 0, fish: 0, need: 0, short: 0, hungry: 0, cap: 80, fed_ids: [] };
+      const cap = r.cap || 80;
+      const fed = new Set(r.fed_ids || []);
+      let hearts = 0;
+      for (const f of data.fish) {
+        if (!fed.has(f.id)) continue;       // 只有本次真正喂到的鱼才播吃食动画
+        const sim = sims.get(f.id);
+        if (!sim) continue;
+        sim.eat = 1;
+        if (hearts < 8) { spawnHearts(sim.x, sim.y); hearts++; }
+      }
+      if (!r.hungry) {
+        toast(`鱼的饱食都超过 ${cap}%，不用喂`);
+      } else if (r.short > 0) {
+        toast(`喂了 ${r.fish} 条 · 消耗 ${r.packs} 包饲料，还差 ${r.short} 包才能都喂到 ${cap}% 以上`, 3200);
+      } else {
+        toast(`已把 ${r.fish} 条鱼喂到 ${cap}% 以上 · 消耗 ${r.packs} 包饲料`, 2600);
+      }
+    } catch (e) {
+      toast(e.message, 2000);
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  $('#btnFeedAll').onclick = (ev) => { ev.stopPropagation(); feedAll(); };
+
   /* ------------------------------------------------------ 买鱼苗弹窗 */
 
-  const SP_ICON = { carp: '🐟', clown: '🐠', shark: '🦈', shrimp: '🦐', clam: '🐚' };
+  let shopEl = null;        // 当前打开的买鱼苗弹窗
+  let shopCart = {};        // key -> 数量，支持一次选多种鱼
+
+  function fmtCoins(v) {
+    const n = Number(v) || 0;
+    return Number.isInteger(n) ? String(n) : n.toFixed(1);
+  }
+
+  // 金币与鱼缸容量信息（容量 0/null 表示不限）
+  function shopCtx() {
+    const cap = (typeof state.capacity === 'number' && state.capacity > 0) ? state.capacity : null;
+    const free = cap === null ? Infinity : Math.max(0, cap - state.fish.length);
+    const coins = state.coins_exact !== undefined ? state.coins_exact : state.coins;
+    return { cap: cap, free: free, coins: coins };
+  }
+
+  function closeShop() {
+    if (shopEl) shopEl.remove();
+    shopEl = null;
+  }
 
   function openShop() {
     if (!state) return;
-    const old = document.querySelector('#shopOverlay');
-    if (old) old.remove();
-    const free = state.capacity - state.fish.length;
-    const coins = state.coins_exact !== undefined ? state.coins_exact : state.coins;
-    const list = (state.prices && state.prices.species) || [];
-    const cards = list.map((sp) => {
-      const poor = coins < sp.price, full = free <= 0;
-      const off = poor || full;
-      const tag = full ? '鱼缸已满' : (poor ? '金币不足' : '可购买');
-      return `<button class="species${off ? ' off' : ''}" data-key="${sp.key}" ${off ? 'disabled' : ''}>
-        <span class="spIcon">${SP_ICON[sp.key] || '🐟'}</span>
-        <span class="spTop"><b>${esc(sp.name)}</b><i class="spPrice">${sp.price} 币</i></span>
-        <span class="spDesc">${esc(sp.desc)}</span>
-        <span class="spTag">${tag}</span>
-      </button>`;
-    }).join('');
+    closeShop();
+    shopCart = {};   // 每次打开都从空购物车开始
 
     const wrap = document.createElement('div');
     wrap.id = 'shopOverlay';
     wrap.className = 'overlay';
     wrap.innerHTML = `<div class="card shopcard">
       <h1>选择鱼苗</h1>
-      <p class="sub">鱼缸 ${state.fish.length}/${state.capacity} · 金币 ${coins.toFixed(1)}</p>
-      <div class="speciesGrid">${cards}</div>
-      ${free <= 0 ? '<div class="hint error">鱼缸已经满了，先养大现有的鱼吧</div>' : ''}
-      <button class="btn full ghost" id="shopClose">关闭</button>
+      <p class="sub" id="shopSub"></p>
+      <div class="speciesGrid" id="shopGrid"></div>
+      <div class="buyBar">
+        <div class="buyPick"><b id="shopPickName">已选鱼苗</b><span id="shopUnit">点卡片右下角 ＋ 加数量</span></div>
+        <div class="buyTotal"><span>合计 <b id="shopCount">0</b> 条</span><span><b class="sum" id="shopTotal">0</b> 金币</span></div>
+        <div class="buyHint" id="shopHint"></div>
+        <button class="btn" id="shopBuy" type="button">确认购买</button>
+      </div>
+      <button class="btn full ghost" id="shopClose" type="button">关闭</button>
     </div>`;
     document.body.appendChild(wrap);
-    wrap.onclick = (e) => { if (e.target === wrap) wrap.remove(); };
-    wrap.querySelector('#shopClose').onclick = () => wrap.remove();
+    shopEl = wrap;
+    wrap.onclick = (e) => { if (e.target === wrap) closeShop(); };
+    wrap.querySelector('#shopClose').onclick = closeShop;
+    wrap.querySelector('#shopBuy').onclick = () => buyFish();
+    renderShopCards();
+    syncShopBar();
+  }
 
-    wrap.querySelectorAll('.species').forEach((btn) => {
-      btn.onclick = async () => {
-        const key = btn.dataset.key;
-        btn.disabled = true;
-        try {
-          const data = await api('/api/fish', 'POST', { name: '', species: key });
-          applyState(data);
-          const last = data.fish[data.fish.length - 1];
-          toast(`${last.species_name || '鱼苗'}「${last.name}」游进了鱼缸`);
-          wrap.remove();
-        } catch (e) {
-          toast(e.message, 1800);
-          btn.disabled = false;
-        }
-      };
+  // 鱼苗卡片：右下角带独立数量步进器，可同时选多种鱼，最后统一确认购买
+  function renderShopCards() {
+    if (!shopEl || !state) return;
+    const grid = shopEl.querySelector('#shopGrid');
+    if (!grid) return;
+    const c = shopCtx();
+    const list = (state.prices && state.prices.species) || [];
+    grid.innerHTML = list.map((sp) => {
+      const poor = c.coins < sp.price;
+      const full = c.free <= 0;
+      const off = poor || full;
+      const qty = shopCart[sp.key] || 0;
+      const tag = full ? '鱼缸已满' : (poor ? '金币不足' : '点 ＋ 选购');
+      return `<div class="species${off ? ' off' : ''}${qty > 0 ? ' picked' : ''}" data-key="${sp.key}">
+        <span class="spIcon">${FishArt.iconOf(sp.look || sp.key)}</span>
+        <span class="spTop"><b>${esc(sp.name)}</b><i class="spPrice">${sp.price} 币</i></span>
+        <span class="spDesc">${esc(sp.desc)}</span>
+        <span class="spFoot">
+          <span class="spTag">${tag}</span>
+          <span class="cardStepper" data-key="${sp.key}">
+            <button class="cardStep" type="button" data-key="${sp.key}" data-delta="-1" aria-label="减少${esc(sp.name)}" ${off || qty <= 0 ? 'disabled' : ''}>−</button>
+            <b class="cardQty">${qty}</b>
+            <button class="cardStep" type="button" data-key="${sp.key}" data-delta="1" aria-label="增加${esc(sp.name)}" ${off ? 'disabled' : ''}>＋</button>
+          </span>
+        </span>
+      </div>`;
+    }).join('');
+    grid.querySelectorAll('.cardStep').forEach((btn) => {
+      bindCardStep(btn);
     });
+  }
+
+  function changeQty(key, delta) {
+    const cur = shopCart[key] || 0;
+    const next = Math.max(0, Math.min(999, cur + delta));
+    if (next === 0) delete shopCart[key];
+    else shopCart[key] = next;
+
+    // 就地更新这张卡片，不重建整个网格：避免卡片闪烁抖动，也保证长按连加时按钮不被销毁
+    const card = shopEl && shopEl.querySelector(`#shopGrid .species[data-key="${key}"]`);
+    if (card) {
+      const qtyEl = card.querySelector('.cardQty');
+      if (qtyEl) qtyEl.textContent = String(next);
+      const minus = card.querySelector('.cardStep[data-delta="-1"]');
+      if (minus) minus.disabled = next <= 0;
+      card.classList.toggle('picked', next > 0);
+    }
+    syncShopBar();
+  }
+
+  // 点按加减一次，按住 400ms 后按 70ms 节奏连续调整
+  function bindCardStep(el) {
+    let delay = null, tick = null;
+    const key = el.dataset.key;
+    const delta = parseInt(el.dataset.delta, 10);
+    const stop = () => {
+      if (delay) { clearTimeout(delay); delay = null; }
+      if (tick) { clearInterval(tick); tick = null; }
+    };
+    const fire = () => { if (!el.disabled) changeQty(key, delta); };
+    el.addEventListener('pointerdown', (ev) => {
+      if (ev.pointerType === 'mouse' && ev.button !== 0) return;
+      ev.preventDefault();
+      stop();
+      fire();
+      delay = setTimeout(() => { delay = null; tick = setInterval(fire, 70); }, 400);
+    });
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach((n) => el.addEventListener(n, stop));
+    window.addEventListener('pointerup', stop);
+    el.addEventListener('click', (ev) => { ev.preventDefault(); if (ev.detail === 0) fire(); });
+  }
+
+  // 同步底部购买栏：合计数量、合计金额、主按钮文案与提示
+  function syncShopBar() {
+    if (!shopEl || !state) return;
+    const c = shopCtx();
+    const list = (state.prices && state.prices.species) || [];
+    const priceOf = {};
+    list.forEach((s) => { priceOf[s.key] = Number(s.price) || 0; });
+
+    let count = 0, total = 0, kinds = 0;
+    Object.keys(shopCart).forEach((key) => {
+      const qty = shopCart[key];
+      if (qty > 0) { count += qty; total += priceOf[key] * qty; kinds += 1; }
+    });
+    total = Math.round(total * 100) / 100;
+
+    const q = (sel) => shopEl.querySelector(sel);
+    const subEl = q('#shopSub');
+    const nameEl = q('#shopPickName');
+    const unitEl = q('#shopUnit');
+    const countEl = q('#shopCount');
+    const totalEl = q('#shopTotal');
+    const buyEl = q('#shopBuy');
+    const hintEl = q('#shopHint');
+
+    if (subEl) {
+      subEl.textContent = (c.cap === null ? `鱼缸 ${state.fish.length} 条` : `鱼缸 ${state.fish.length}/${c.cap}`)
+        + ` · 金币 ${c.coins.toFixed(1)}`;
+    }
+    if (countEl) countEl.textContent = String(count);
+    if (totalEl) totalEl.textContent = fmtCoins(total);
+    if (nameEl) nameEl.textContent = kinds ? `已选 ${kinds} 种鱼苗` : '已选鱼苗';
+    if (unitEl) unitEl.textContent = kinds ? `共 ${count} 条` : '点卡片右下角 ＋ 加数量';
+
+    const overCap = c.free !== Infinity && count > c.free;
+    const overCoin = total > c.coins + 1e-9;
+    const can = count > 0 && !overCap && !overCoin;
+    if (buyEl) {
+      buyEl.disabled = !can;
+      buyEl.textContent = can ? `确认购买 ${count} 条`
+        : (count < 1 ? '请先选择鱼苗' : (overCap ? '超出鱼缸容量' : '金币不足'));
+    }
+    if (hintEl) {
+      let txt = '', warn = false;
+      if (!list.length) { txt = '暂无可购买鱼种'; warn = true; }
+      else if (c.free <= 0) { txt = '鱼缸已经满了，先养大现有的鱼吧'; warn = true; }
+      else if (count < 1) { txt = '点鱼苗卡片右下角 ＋ 添加数量，可一次选购多种'; }
+      else if (overCap) { txt = `鱼缸只剩 ${c.free} 个空位，请减少数量`; warn = true; }
+      else if (overCoin) { txt = `金币不足，还差 ${fmtCoins(Math.round((total - c.coins) * 100) / 100)} 金币`; warn = true; }
+      else { txt = `金币 ${c.coins.toFixed(1)}，鱼缸空位 ${c.free === Infinity ? '不限' : c.free}`; }
+      hintEl.textContent = txt;
+      hintEl.classList.toggle('warn', warn);
+    }
+  }
+
+  // 购买：一次请求带上全部所选鱼种与数量，后端校验总价与容量后原子扣费
+  async function buyFish() {
+    if (!shopEl || !state) return;
+    const list = (state.prices && state.prices.species) || [];
+    const valid = {};
+    list.forEach((s) => { valid[s.key] = true; });
+    const items = Object.keys(shopCart)
+      .filter((key) => valid[key] && shopCart[key] > 0)
+      .map((key) => ({ species: key, count: shopCart[key] }));
+    if (!items.length) return;
+    const buyEl = shopEl.querySelector('#shopBuy');
+    if (buyEl) { buyEl.disabled = true; buyEl.textContent = '购买中…'; }
+    try {
+      const data = await api('/api/fish/batch', 'POST', { items });
+      afterBuy(data);
+    } catch (e) {
+      toast(e.message, 2400);
+    } finally {
+      // 购买成功后 afterBuy 会关闭弹窗；失败时只恢复按钮状态，不重建卡片网格
+      if (shopEl) syncShopBar();
+    }
+  }
+
+  function afterBuy(data) {
+    applyState(data);      // 余额、鱼数即时刷新
+    const bought = data.bought || {};
+    const n = bought.count || 0;
+    if (n > 0) {
+      const spent = bought.spent || 0;
+      toast(`买了 ${n} 条鱼苗 · 花掉 ${fmtCoins(spent)} 金币`, 2400);
+      shopCart = {};       // 结算后清空购物车
+      closeShop();         // 购买成功后关闭弹窗
+    }
   }
 
   $('#btnFood').onclick = async () => {
@@ -401,25 +742,24 @@
     if (old) old.remove();
     const wrap = document.createElement('div');
     wrap.id = 'boardOverlay';
-    wrap.style.cssText = `position:fixed;inset:0;background:rgba(3,16,24,.66);display:flex;
-      align-items:center;justify-content:center;z-index:20;padding:20px;backdrop-filter:blur(4px)`;
+    wrap.className = 'overlay';
     const rows = rank.length
       ? rank.map((r, i) => `<tr>
-          <td style="width:34px;color:#8fb3c7">${i + 1}</td>
+          <td class="idx">${i + 1}</td>
           <td>${esc(r.username)}</td>
-          <td style="color:#4be0c8">${r.best_stage}</td>
-          <td style="text-align:right;color:#ffcc4d">${r.total_growth}</td>
+          <td class="stage">${r.best_stage}</td>
+          <td class="num">${r.total_growth}</td>
         </tr>`).join('')
-      : '<tr><td colspan="4" style="color:#8fb3c7">还没有鱼缸被创建</td></tr>';
-    wrap.innerHTML = `<div class="card" style="max-width:420px">
-      <h1 style="font-size:19px">成长排行榜</h1>
+      : '<tr><td colspan="4" class="blank">还没有鱼缸被创建</td></tr>';
+    wrap.innerHTML = `<div class="card boardcard">
+      <h1>成长排行榜</h1>
       <p class="sub">按全缸鱼的成长值总和排序</p>
-      <table style="width:100%;border-collapse:collapse;font-size:13px">
-        <thead><tr style="color:#8fb3c7;font-size:11px">
-          <th style="text-align:left;padding-bottom:6px">#</th>
-          <th style="text-align:left;padding-bottom:6px">玩家</th>
-          <th style="text-align:left;padding-bottom:6px">最好阶段</th>
-          <th style="text-align:right;padding-bottom:6px">总成长</th>
+      <table class="boardTable">
+        <thead><tr>
+          <th>#</th>
+          <th>玩家</th>
+          <th>最好阶段</th>
+          <th class="num">总成长</th>
         </tr></thead>
         <tbody>${rows}</tbody>
       </table>
@@ -489,7 +829,11 @@
 
   function fishRadius(f, sim) {
     const depth = 0.72 + 0.55 * (sim.y / Math.max(1, H));
-    return 26 * f.stage.scale * depth * speciesFx(f.species || 'carp').size;
+    // 体型系数来自后台配置（接口下发的 f.size），缺省回落到内置表现参数
+    const size = (typeof f.size === 'number' && f.size > 0)
+      ? f.size
+      : speciesFx(f.look || f.species || 'carp').size;
+    return 26 * f.stage.scale * depth * size;
   }
 
   /* ---------------------------------------------- 每条鱼独立的游动性格
@@ -502,16 +846,16 @@
 
   // 鱼种表现参数：size 体型、行为在 newSim 里按种类覆写
   const SPECIES_FX = {
-    carp: { size: 0.85 },
-    clown: { size: 0.75 },
-    shark: { size: 1.9 },
-    shrimp: { size: 0.55 },
-    clam: { size: 1.0 },
+    carp: { size: 0.85 }, clown: { size: 0.75 }, shark: { size: 1.9 },
+    shrimp: { size: 0.55 }, clam: { size: 1.0 }, goldfish: { size: 0.95 },
+    koi: { size: 1.05 }, guppy: { size: 0.6 }, angelfish: { size: 1.1 },
+    tetra: { size: 0.52 }, puffer: { size: 0.8 }, seahorse: { size: 0.75 },
   };
   const speciesFx = (key) => SPECIES_FX[key] || SPECIES_FX.carp;
 
-  function newSim(species) {
-    const key = SPECIES_FX[species] ? species : 'carp';
+  function newSim(look) {
+    // 外观造型决定游动性格；后台新增鱼种未选造型时回落到鲤鱼外形与游法
+    const key = FishArt.normalize(look);
     const lo = rnd(0.12, 0.45);
     let hi = Math.min(0.9, lo + rnd(0.15, 0.4));
     const s = {
@@ -521,6 +865,14 @@
       tx: W * rnd(0.1, 0.9),
       ty: H * rnd(lo, hi),
       dir: Math.random() > 0.5 ? 1 : -1,
+      flipCd: 0,               // 朝向翻转冷却计时（秒），配合 faceToward 防抖动
+      vx: 0, vy: 0,            // 当前速度向量（px/s），由线性加速度平滑驱动
+      hsgn: 1,                 // 横向方向粘滞符号（避免目标在正上下方时逐帧左右翻）
+      boost: 1,                // 冲刺倍率（渐变，不是瞬时跳变）
+      tempo: rnd(0.6, 1.1),    // 自然游动节奏倍率：0=停顿、1=常速，平滑换挡
+      tempoT: rnd(0.6, 1.1),   // 节奏目标倍率
+      tempoCd: rnd(1, 4),      // 距下次换挡的倒计时（秒）
+      omega: 0,                // circle 模式的角速度（平滑过渡）
       phase: rnd(0, 6.2832),
       eat: 0,
       hold: 0,
@@ -544,6 +896,8 @@
       gape: 0.18,              // 砗磲开合程度
       gapeT: rnd(0, 6),
     };
+    s.spin = s.phase > 3.1416 ? 1 : -1;   // circle 固定绕行方向，避免来回抖动
+    s.sineDir = s.dir;                    // sine 横向行进方向
     if (s.pattern === 'bottom') {           // 贴底巡游
       s.bandLo = 0.68; s.bandHi = 0.9;
       s.ty = H * rnd(0.72, 0.88);
@@ -601,7 +955,58 @@
       s.idle = 0;
       s.idleChance = 1;
       s.gape = rnd(0.1, 0.4);
+    } else if (key === 'goldfish' || key === 'koi') {
+      // 金鱼 / 锦鲤：慢悠悠 MID 层巡游，宽鳍大幅摆动
+      s.pattern = Math.random() < 0.5 ? 'cruise' : 'sine';
+      s.bandLo = rnd(0.2, 0.42);
+      s.bandHi = Math.min(0.78, s.bandLo + rnd(0.2, 0.34));
+      s.speedK = rnd(0.5, 0.9);
+      s.wobble = rnd(1.2, 2.2);
+      s.amp = rnd(14, 24);
+      s.idleChance = 0.26;
+      s.idleRange = [0.7, 2.6];
+    } else if (key === 'guppy' || key === 'tetra') {
+      // 孔雀鱼 / 灯鱼：小鱼群活跃穿梭，摆尾频率高
+      s.pattern = Math.random() < 0.6 ? 'sine' : 'cruise';
+      s.bandLo = rnd(0.22, 0.5);
+      s.bandHi = Math.min(0.8, s.bandLo + rnd(0.18, 0.32));
+      s.speedK = rnd(0.95, 1.45);
+      s.wobble = rnd(2, 3.2);
+      s.amp = rnd(7, 16);
+      s.idleChance = 0.12;
+    } else if (key === 'angelfish') {
+      // 神仙鱼：长鳍慢摆，偏中层小范围悬停
+      s.pattern = Math.random() < 0.5 ? 'hover' : 'sine';
+      s.bandLo = rnd(0.28, 0.46);
+      s.bandHi = Math.min(0.72, s.bandLo + rnd(0.14, 0.26));
+      s.speedK = rnd(0.42, 0.78);
+      s.wobble = rnd(0.7, 1.3);
+      s.amp = rnd(12, 22);
+      s.idleChance = 0.3;
+    } else if (key === 'puffer') {
+      // 河豚：圆滚滚，小鳍快速扑腾，活动范围小
+      s.pattern = 'hover';
+      s.bandLo = rnd(0.3, 0.55);
+      s.bandHi = Math.min(0.78, s.bandLo + rnd(0.12, 0.22));
+      s.speedK = rnd(0.32, 0.66);
+      s.wobble = rnd(2.6, 4);
+      s.amp = rnd(5, 11);
+      s.idleChance = 0.22;
+    } else if (key === 'seahorse') {
+      // 海马：悬停为主，只在中层微微起伏
+      s.pattern = 'hover';
+      s.bandLo = rnd(0.24, 0.48);
+      s.bandHi = Math.min(0.74, s.bandLo + rnd(0.1, 0.2));
+      s.speedK = rnd(0.15, 0.32);
+      s.wobble = rnd(0.6, 1.2);
+      s.amp = rnd(3, 8);
+      s.idleChance = 0.55;
+      s.idleRange = [1.2, 3.6];
     }
+    s.hsgn = s.dir;            // 横向粘滞方向与初始朝向一致
+    // 固定绘制层级：只在建鱼时按初始 y 定一次，之后不再随实时位置变化。
+    // 否则两条鱼上下游动、y 一交叉，前后顺序每帧翻转，看起来像相互穿体。
+    s.layer = s.y;
     return s;
   }
 
@@ -617,7 +1022,45 @@
     s.ty = rnd(lo, hi);
   }
 
+  // 统一朝向翻转：滞回阈值 + 转向冷却，避免鱼停在目标点附近时每帧左右镜像翻转
+  const FLIP_HYST = 12;          // 水平差值小于该值（px）时保持当前朝向，不翻转
+  const FLIP_COOLDOWN = 0.3;     // 两次翻转之间的最小间隔（秒）
+
+  function faceToward(s, dx) {
+    if (Math.abs(dx) < FLIP_HYST) return;        // 距离太近，维持原朝向
+    const want = dx > 0 ? 1 : -1;
+    if (want === s.dir) return;                  // 已经是这个朝向
+    if (s.flipCd > 0) return;                    // 转向冷却中，暂不翻转
+    s.dir = want;
+    s.flipCd = FLIP_COOLDOWN;
+  }
+
+  // 线性加速度 + 角度插值的统一游动积分：速度大小与航向都只能按上限逐帧逼近目标，
+  // 位置始终连续推进，因此不会再出现「到点 return」造成的整帧静止。
+  const TILT_CRUISE = 0.80;    // 巡航时相对水平的最大倾角（约 46°），保证横向一直在动
+  const TILT_HOVER = 0.80;     // 悬停时允许的上下摆尾倾角（约 46°）
+  const TILT_CIRCLE = 1.15;    // 绕圈时限制在椭圆左右端点处的垂直切向，避免只上下平移
+  const TILT_BOTTOM = 0.62;    // 贴底慢速巡游更偏水平，慢速下也保证横向位移够大
+
+  function normAng(a) {
+    return Math.atan2(Math.sin(a), Math.cos(a));
+  }
+
+  // 把目标航向限制在「接近水平」的锥形范围内，避免出现只上下平移、横向卡死的泳姿。
+  // 期望航向本身接近正上/正下（横向分量极小）时，横向一侧改用粘滞符号 hsgn，
+  // 避免目标在本鱼正上/正下方时航向逐帧在左右两侧来回翻、结果只剩上下动。
+  function clampTilt(ang, maxTilt, hsgn) {
+    const down = Math.sin(ang) >= 0;
+    const cosA = Math.cos(ang);
+    let sgnH;
+    if (Math.abs(cosA) >= 0.25) sgnH = cosA > 0 ? 1 : -1;
+    else sgnH = (hsgn === undefined || hsgn === null) ? (cosA >= 0 ? 1 : -1) : (hsgn >= 0 ? 1 : -1);
+    if (sgnH > 0) return down ? maxTilt : -maxTilt;
+    return down ? Math.PI - maxTilt : -Math.PI + maxTilt;
+  }
+
   function stepFish(s, dt, speed) {
+    if (s.flipCd > 0) s.flipCd = Math.max(0, s.flipCd - dt);   // 冷却计时
     // 砗磲：钉在原位，只做开合贝壳
     if (s.pattern === 'sessile') {
       s.gapeT += dt;
@@ -625,68 +1068,169 @@
       const target = Math.pow(wave, 2.4);       // 多数时间微张，偶尔大张
       s.gape += (target - s.gape) * Math.min(1, dt * 2.0);
       s.x = s.tx; s.y = s.ty;
+      s.vx = 0; s.vy = 0;
       return;
     }
-    // 随机打盹：让节奏错开，避免整缸鱼同步
-    if (s.idle > 0) {
-      s.idle -= dt;
-      const calm = s.pattern === 'crawl' ? 0.25 : 1;   // 小虾打盹时几乎不动
-      s.x += Math.cos(s.phase * s.wobble) * 5 * dt * calm;
-      s.y += Math.sin(s.phase * s.wobble * 1.3) * 7 * dt * calm;
-      return;
-    }
+
+    const vCruise = Math.max(5, speed * s.speedK);   // 该鱼的巡航速度（含鱼种个性）
+    const acc = vCruise * 3.4 + 30;                  // 加速度上限 px/s²
+    const dec = vCruise * 4.2 + 36;                  // 减速上限 px/s²
+    const turn = 3.0 + s.speedK * 1.1;                // 最大转向角速度 rad/s
+
+    // 冲刺：倍率逐帧渐变到 1.45，不再出现瞬时 ×1.75 的速度阶跃
     if (s.burst > 0) s.burst = Math.max(0, s.burst - dt);
-    else if (Math.random() < dt * 0.1) s.burst = rnd(0.45, 1.1);
-    const v = speed * s.speedK * (s.burst > 0 ? 1.75 : 1);
+    else if (Math.random() < dt * 0.06) s.burst = rnd(0.6, 1.2);
+    const boostT = s.burst > 0 ? 1.45 : 1;
+    s.boost += (boostT - s.boost) * Math.min(1, dt * 2.2);
+
+    // 自然游动节奏：每条鱼独立在「停顿 / 慢游 / 常速 / 快游」之间平滑换挡，
+    // 让同一条鱼时快时慢、偶尔停下来，而不是一直匀速。
+    s.tempoCd -= dt;
+    if (s.tempoCd <= 0) {
+      const r = Math.random();
+      if (r < 0.16) {              // 停顿：真正停下来悬着
+        s.tempoT = rnd(0, 0.06);
+        s.tempoCd = rnd(1.6, 4.2);
+      } else if (r < 0.42) {       // 慢游
+        s.tempoT = rnd(0.22, 0.52);
+        s.tempoCd = rnd(2.5, 5.5);
+      } else if (r < 0.82) {       // 常速
+        s.tempoT = rnd(0.82, 1.12);
+        s.tempoCd = rnd(2.5, 6);
+      } else {                     // 快游
+        s.tempoT = rnd(1.22, 1.5);
+        s.tempoCd = rnd(1.8, 4);
+      }
+    }
+    s.tempo += (s.tempoT - s.tempo) * Math.min(1, dt * 0.9);   // 平滑换挡，不突变
+
+    // 打盹：到点小憩时进一步压低节奏（小虾趴得更彻底）
+    if (s.idle > 0) s.idle = Math.max(0, s.idle - dt);
+    const idleK = s.idle > 0 ? (s.pattern === 'crawl' ? 0.12 : 0.28) : 1;
+    const vTop = vCruise * s.boost * s.tempo * idleK;
+
+    // 正弦波浪：横向匀速往返，贴边直接折返（速度大小不变，位置不抖）
+    if (s.pattern === 'sine') {
+      const v = vTop * 0.9;
+      const mid = H * (s.bandLo + s.bandHi) / 2;
+      const wobK = Math.min(1, s.tempo * 2.5);   // 停顿时上下摆动也停
+      const vyWob = (Math.cos(s.phase * s.wobble) * s.amp * 1.4 + (mid - s.y) * 0.55) * wobK;
+      s.x += s.sineDir * v * dt;
+      s.y += vyWob * dt;
+      if (s.x > W - 30) { s.x = W - 30; s.sineDir = -1; }
+      if (s.x < 30) { s.x = 30; s.sineDir = 1; }
+      s.vx = s.sineDir * v;
+      s.vy = vyWob;
+      faceToward(s, s.sineDir * 100);
+      return;
+    }
+
+    let dvx = 0, dvy = 0;      // 本帧的目标速度向量
 
     if (s.pattern === 'circle') {
-      // 沿自己的椭圆轨迹巡游，圆心缓慢漂移
-      s.angle += dt * (0.45 + s.speedK * 0.4) * (s.dir > 0 ? 1 : -1);
+      // 沿椭圆切线前进：角速度按「本鱼巡航速度 / 当前切向半径」换算，
+      // 让轨迹点与鱼同速，鱼不会追不上轨迹点也不会被拖着瞬移
+      const aE = W * s.radiusXR, bE = H * s.radiusYR;
+      const tang = Math.max(20, Math.hypot(aE * Math.sin(s.angle), bE * Math.cos(s.angle)));
+      const omegaT = s.spin * Math.min(2.2, (vTop * 0.85) / tang);
+      s.omega += (omegaT - s.omega) * Math.min(1, dt * 2.5);
+      s.angle += s.omega * dt;
       s.cxr += Math.sin(s.angle * s.drift) * dt * 0.05;
       s.cyr += Math.cos(s.angle * s.drift * 1.3) * dt * 0.04;
       s.cxr = Math.max(0.2, Math.min(0.8, s.cxr));
       s.cyr = Math.max(0.24, Math.min(0.76, s.cyr));
-      const nx = W * s.cxr + Math.cos(s.angle) * W * s.radiusXR;
-      const ny = H * s.cyr + Math.sin(s.angle) * H * s.radiusYR;
-      const k = Math.min(1, dt * 4.5);
-      if (Math.abs(nx - s.x) > 0.5) s.dir = nx > s.x ? 1 : -1;
-      s.x += (nx - s.x) * k;
-      s.y += (ny - s.y) * k;
-      return;
+      const nx = W * s.cxr + Math.cos(s.angle) * aE;
+      const ny = H * s.cyr + Math.sin(s.angle) * bE;
+      const sgn = s.omega >= 0 ? 1 : -1;
+      const tx2 = -Math.sin(s.angle) * aE * sgn;
+      const ty2 = Math.cos(s.angle) * bE * sgn;
+      const tl = Math.hypot(tx2, ty2) || 1;
+      const spd2 = vTop * 0.85;
+      const corrK = Math.min(1, s.tempo * 2.5);   // 停顿时纠偏也停，不被拖着走
+      const corrX = Math.max(-18, Math.min(18, (nx - s.x) * 0.25)) * corrK;   // 纠偏有上限，避免误差累积后速度失控
+      const corrY = Math.max(-18, Math.min(18, (ny - s.y) * 0.25)) * corrK;
+      dvx = (tx2 / tl) * spd2 + corrX;     // 切线速度 + 限幅纠偏
+      dvy = (ty2 / tl) * spd2 + corrY;
+      // 切向在椭圆左右端点附近接近垂直，这里限制倾角，让鱼横向兜过去而不是只上下平移
+      const magC = Math.hypot(dvx, dvy) || 1;
+      const magCap = Math.max(spd2 * 1.12, 12 * Math.min(1, s.tempo * 2.5));   // 目标速度上限：巡游切速附近，避免纠偏把速度顶飞
+      const angC = clampTilt(Math.atan2(dvy, dvx), TILT_CIRCLE);
+      dvx = Math.cos(angC) * magC;
+      dvy = Math.sin(angC) * magC;
+      if (magC > magCap) {
+        const kc = magCap / magC;
+        dvx *= kc; dvy *= kc;
+      }
+    } else {
+      // 悬停：隔一会儿换个落脚点，但换点不为零位移
+      if (s.pattern === 'hover' && Math.random() < dt * 0.18) pickTarget(s);
+      let dx = s.tx - s.x, dy = s.ty - s.y;
+      let dist = Math.hypot(dx, dy);
+      const reach = Math.max(s.pattern === 'crawl' ? 8 : 16, vTop * dt * 2.2);
+      if (dist < reach) {
+        // 到点只换目标，本帧继续按新目标推进，不再 return 静止一帧
+        if (Math.random() < s.idleChance) s.idle = rnd(s.idleRange[0], s.idleRange[1]);
+        pickTarget(s);
+        dx = s.tx - s.x; dy = s.ty - s.y;
+        dist = Math.hypot(dx, dy) || 1;
+      }
+      const inv = 1 / (dist || 1);
+      // 接近目标线性减速，但保留最低巡航分量，避免速度塌陷成停顿
+      const floorK = s.pattern === 'hover' ? 0.5 : 0.42;
+      const slowK = Math.min(1, dist / (vCruise * 0.9 + 1));
+      const spd = vTop * (floorK + (1 - floorK) * slowK);
+      const wobK = Math.min(1, s.tempo * 2.5);   // 停顿时摆尾位移归零
+      dvx = dx * inv * spd;
+      dvy = dy * inv * spd + Math.sin(s.phase * s.wobble) * s.amp * 0.5 * wobK;
+      // 限制泳姿倾角，保证横向始终有位移（不会出现"只上下动"的卡顿）
+      const mag = Math.hypot(dvx, dvy) || 1;
+      const tiltCap = s.pattern === 'hover' ? TILT_HOVER
+        : (s.pattern === 'bottom' ? TILT_BOTTOM : TILT_CRUISE);
+      // 横向粘滞方向：只有明显偏到另一侧才改，避免目标在本鱼正上/正下方时航向左右逐帧翻
+      if (dx > 6) s.hsgn = 1;
+      else if (dx < -6) s.hsgn = -1;
+      const ang = clampTilt(Math.atan2(dvy, dvx), tiltCap, s.hsgn);
+      dvx = Math.cos(ang) * mag;
+      dvy = Math.sin(ang) * mag;
     }
 
-    if (s.pattern === 'sine') {
-      // 横向波浪前进，只在自己那条水层里起伏
-      s.x += s.dir * v * dt;
-      const mid = H * (s.bandLo + s.bandHi) / 2;
-      const pull = (mid - s.y) * 0.55 * dt;
-      s.y += Math.cos(s.phase * s.wobble) * s.amp * dt * 1.4 + pull;
-      if (s.x > W - 30) { s.x = W - 30; s.dir = -1; }
-      if (s.x < 30) { s.x = 30; s.dir = 1; }
-      return;
+    // ---- 线性加速度 + 角度插值 ----
+    const spdT = Math.hypot(dvx, dvy);
+    let spdNow = Math.hypot(s.vx, s.vy);
+    const dSpd = spdT - spdNow;
+    const maxDSpd = (dSpd > 0 ? acc : dec) * dt;
+    spdNow = Math.max(0, spdNow + Math.max(-maxDSpd, Math.min(maxDSpd, dSpd)));
+    // 速度下限跟随节奏：停顿挡（tempo 接近 0）允许真正停下，其余挡位保留少量漂移避免卡顿观感
+    if (s.pattern !== 'crawl') {
+      const minMove = Math.max(24, vCruise * 0.40) * Math.min(1, s.tempo * 2.5);
+      if (spdNow < minMove) spdNow = minMove;
     }
 
-    if (s.pattern === 'hover') {
-      // 原地小幅摆尾，偶尔换一个落脚点
-      if (Math.random() < dt * 0.18) pickTarget(s);
-      const k = Math.min(1, dt * 0.7);
-      s.x += (s.tx - s.x) * k + Math.cos(s.phase * s.wobble * 0.7) * s.amp * dt * 0.7;
-      s.y += (s.ty - s.y) * k + Math.sin(s.phase * s.wobble) * s.amp * dt * 0.8;
-      if (Math.abs(s.tx - s.x) > 1) s.dir = s.tx > s.x ? 1 : -1;
-      return;
-    }
+    const angT = Math.atan2(dvy, dvx);
+    let angNow = (spdNow > 1e-3 && (Math.abs(s.vx) + Math.abs(s.vy) > 1e-3))
+      ? Math.atan2(s.vy, s.vx) : angT;
+    const maxTurn = turn * dt;
+    let dif = normAng(angT - angNow);
+    if (Math.abs(dif) > maxTurn) dif = Math.sign(dif) * maxTurn;
+    angNow = normAng(angNow + dif);
 
-    // cruise / bottom：朝自己的目标点游，叠加摆动
-    const dx = s.tx - s.x, dy = s.ty - s.y;
-    const dist = Math.hypot(dx, dy);
-    if (dist < 14) {
-      if (Math.random() < s.idleChance) s.idle = rnd(s.idleRange[0], s.idleRange[1]);
-      pickTarget(s);
-      return;
+    s.vx = Math.cos(angNow) * spdNow;
+    s.vy = Math.sin(angNow) * spdNow;
+    // 横向位移硬下限：转向过程中航向会经过正上/正下，此时纯竖直位移看起来像"横向卡住"。
+    // 这里只把横向分量抬到总速度的 55%（纵向分量不动，速度大小最多涨 9%），
+    // 横向符号沿用粘滞方向，因此是连续滑行而不是左右抖动。
+    if (s.pattern !== 'crawl') {
+      const gx = s.tx - s.x;
+      if (gx > 6) s.hsgn = 1;
+      else if (gx < -6) s.hsgn = -1;
+      const minVx = spdNow * 0.55 * Math.min(1, s.tempo * 2.5);
+      if (Math.abs(s.vx) < minVx) s.vx = s.hsgn * minVx;
     }
-    s.x += (dx / dist) * v * dt;
-    s.y += (dy / dist) * v * dt + Math.sin(s.phase * s.wobble) * s.amp * dt * 0.65;
-    if (Math.abs(dx) > 2) s.dir = dx > 0 ? 1 : -1;
+    s.x += s.vx * dt;
+    s.y += s.vy * dt;
+
+    // 朝向只影响镜面翻转，不参与位移，因此翻转不会打断位置连续性
+    faceToward(s, Math.cos(angNow) * 100);
   }
 
   function update(dt) {
@@ -698,12 +1242,14 @@
       // 被拖拽的鱼完全跟随指针，不参与自主游动
       if (drag && drag.id === f.id) {
         s.phase += dt * 6;
+        s.vx = 0; s.vy = 0;
         continue;
       }
       // 刚放下的鱼先原地停留一会儿
       if (s.hold > 0) {
         s.hold = Math.max(0, s.hold - dt);
         s.phase += dt * 1.8;
+        s.vx = 0; s.vy = 0;
         continue;
       }
 
@@ -714,7 +1260,8 @@
       // 边界兜底
       s.x = Math.max(30, Math.min(W - 30, s.x));
       s.y = Math.max(40, Math.min(H - 40, s.y));
-      s.phase += dt * (2.2 + speed * 0.05) * (0.7 + s.speedK * 0.4);
+      // 摆尾节奏跟随游动速度：停顿时摆尾也慢下来，快游时更欢快
+      s.phase += dt * (1.2 + speed * 0.05 * s.tempo) * (0.7 + s.speedK * 0.4) * (0.35 + 0.65 * s.tempo);
       if (s.eat > 0) s.eat = Math.max(0, s.eat - dt * 1.6);
     }
 
@@ -735,32 +1282,45 @@
   }
 
   function draw(t) {
-    // 水体
+    // 水体（颜色随界面风格变化）
     const g = ctx.createLinearGradient(0, 0, 0, H);
-    g.addColorStop(0, '#14607f');
-    g.addColorStop(0.45, '#0c3f58');
-    g.addColorStop(1, '#06202e');
+    g.addColorStop(0, pal.waterTop);
+    g.addColorStop(0.45, pal.waterMid);
+    g.addColorStop(1, pal.waterBot);
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, W, H);
 
-    // 顶部光柱
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    for (let i = 0; i < 4; i++) {
-      const x = W * (0.15 + i * 0.22) + Math.sin(t * 0.25 + i) * 26;
-      const lg = ctx.createLinearGradient(x, 0, x + 70, H * 0.8);
-      lg.addColorStop(0, 'rgba(140, 235, 255, 0.10)');
-      lg.addColorStop(1, 'rgba(140, 235, 255, 0)');
-      ctx.fillStyle = lg;
-      ctx.beginPath();
-      ctx.moveTo(x - 30, 0);
-      ctx.lineTo(x + 40, 0);
-      ctx.lineTo(x + 110, H);
-      ctx.lineTo(x - 70, H);
-      ctx.closePath();
-      ctx.fill();
+    if (currentTheme() === 'cartoon') {
+      // 明亮卡通：水面透下来的柔光——横向均匀、从顶部向下渐隐的蓝色亮光（不是条状光柱）
+      // 用普通半透明叠加而非 lighter：避免在本就偏亮的浅蓝底色上把通道顶到 255 变纯白
+      ctx.save();
+      const glow = ctx.createLinearGradient(0, 0, 0, H * 0.5);
+      glow.addColorStop(0, 'rgba(205, 238, 255, .6)');
+      glow.addColorStop(0.45, 'rgba(180, 230, 255, .24)');
+      glow.addColorStop(1, 'rgba(180, 230, 255, 0)');
+      ctx.fillStyle = glow;
+      ctx.fillRect(0, 0, W, H * 0.5);
+      ctx.restore();
+    } else {
+      // 经典深海：4 条顶部光柱
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      for (let i = 0; i < 4; i++) {
+        const x = W * (0.15 + i * 0.22) + Math.sin(t * 0.25 + i) * 26;
+        const lg = ctx.createLinearGradient(x, 0, x + 70, H * 0.8);
+        lg.addColorStop(0, pal.beam);
+        lg.addColorStop(1, pal.beamFade);
+        ctx.fillStyle = lg;
+        ctx.beginPath();
+        ctx.moveTo(x - 30, 0);
+        ctx.lineTo(x + 40, 0);
+        ctx.lineTo(x + 110, H);
+        ctx.lineTo(x - 70, H);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.restore();
     }
-    ctx.restore();
 
     // 水草
     drawPlants(t);
@@ -769,22 +1329,27 @@
     for (const b of bubbles) {
       ctx.beginPath();
       ctx.arc(b.x, b.y, b.r, 0, 6.2832);
-      ctx.strokeStyle = 'rgba(200, 240, 255, 0.28)';
+      ctx.strokeStyle = pal.bubble;
       ctx.lineWidth = 1;
       ctx.stroke();
     }
 
     if (!state) return;
 
-    // 鱼（远小近大，按 y 排序）
+    // 鱼（按固定层级排序：谁在前面就一直在前面，不随游动时的 y 变化来回翻转）
     const list = state.fish
       .map((f) => ({ f, s: sims.get(f.id) }))
-      .filter((o) => o.s)
-      .sort((a, b) => {
-        const ad = drag && drag.id === a.f.id ? 1 : 0;
-        const bd = drag && drag.id === b.f.id ? 1 : 0;
-        return ad - bd || a.s.y - b.s.y;   // 拖拽中的鱼画在最上层
-      });
+      .filter((o) => o.s);
+    // 惰性补齐固定层级（兼容尚未重建的旧 sim）：按当前 y 定一次后不再变化
+    for (const o of list) {
+      if (o.s.layer === undefined) o.s.layer = o.s.y;
+    }
+    list.sort((a, b) => {
+      const ad = drag && drag.id === a.f.id ? 1 : 0;
+      const bd = drag && drag.id === b.f.id ? 1 : 0;
+      if (ad !== bd) return ad - bd;     // 拖拽中的鱼画在最上层
+      return (a.s.layer - b.s.layer) || (a.f.id - b.f.id);  // 固定层级；相同时用 id 兜底保证稳定
+    });
 
     for (const { f, s } of list) {
       drawFish(f, s, t);
@@ -800,7 +1365,7 @@
       } else {
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.r, 0, 6.2832);
-        ctx.fillStyle = 'rgba(200,245,255,.85)';
+        ctx.fillStyle = pal.bubbleFill;
         ctx.fill();
       }
       ctx.globalAlpha = 1;
@@ -818,14 +1383,14 @@
       ctx.moveTo(x, baseY);
       ctx.quadraticCurveTo(x + sway * 0.5, baseY - h * 0.55, x + sway, baseY - h);
       ctx.lineWidth = 3 + (i % 3);
-      ctx.strokeStyle = i % 2 ? 'rgba(40, 150, 120, .45)' : 'rgba(30, 120, 100, .38)';
+      ctx.strokeStyle = i % 2 ? pal.plantA : pal.plantB;
       ctx.lineCap = 'round';
       ctx.stroke();
     }
     // 沙底
     const sg = ctx.createLinearGradient(0, H - 26, 0, H);
-    sg.addColorStop(0, 'rgba(30, 70, 88, 0)');
-    sg.addColorStop(1, 'rgba(12, 40, 54, .95)');
+    sg.addColorStop(0, pal.sandA);
+    sg.addColorStop(1, pal.sandB);
     ctx.fillStyle = sg;
     ctx.fillRect(0, H - 26, W, 26);
     ctx.restore();
@@ -848,33 +1413,32 @@
     ctx.globalAlpha = 0.16;
     ctx.beginPath();
     ctx.ellipse(0, r * 0.95, r * 0.85, r * 0.22, 0, 0, 6.2832);
-    ctx.fillStyle = '#00131c';
+    ctx.fillStyle = pal.fishShadow;
     ctx.fill();
     ctx.restore();
   }
 
   function drawFish(f, s, t) {
     const r = fishRadius(f, s);
-    const key = f.species || 'carp';
+    const look = FishArt.normalize(f.look || f.species);
     const hungry = f.hunger < 15;
     const wag = Math.sin(s.phase) * 0.32;
     const tilt = Math.sin(s.phase * 0.6) * 0.05;
-    const sat = hungry ? 26 : 62;
-    const light = hungry ? 50 : 62;
+    // 饱和度/明度按主题微调：明亮卡通更饱和明亮，经典深海保持原样
+    const sat = Math.min(96, (hungry ? 26 : 62) * pal.satK);
+    const light = Math.min(80, (hungry ? 50 : 62) * pal.lightK);
 
     ctx.save();
     ctx.translate(s.x, s.y);
-    if (key === 'clam') {
-      drawClam(f, s, r, sat, light);          // 砗磲不翻方向、不随游动倾斜
-    } else {
+    if (look !== 'clam') {
       ctx.scale(s.dir, 1);
       ctx.rotate(tilt);
       drawShadow(r);
-      if (key === 'shrimp') drawShrimp(f, r, sat, light);
-      else if (key === 'shark') drawShark(f, r, sat, light);
-      else if (key === 'clown') drawClown(f, s, r, sat, light, wag);
-      else drawCarp(f, s, r, sat, light, wag);
     }
+    FishArt.draw(ctx, {
+      look, r, hue: f.hue, sat, light, wag,
+      ink: pal.fishInk, inkW: pal.inkW, gape: s.gape, phase: s.phase,
+    });
     ctx.restore();
 
     if (hungry) drawHungerMark(s, r);
@@ -897,371 +1461,12 @@
     }
   }
 
-  /* ------------------------------------------------------ 各鱼种外形 */
-
-  // 鲤鱼：圆润的身体 + 扇尾
-  function drawCarp(f, s, r, sat, light, wag) {
-    const body = `hsl(${f.hue}, ${sat}%, ${light}%)`;
-    const finC = `hsla(${f.hue}, ${sat}%, ${light - 8}%, .85)`;
-
-    ctx.save();
-    ctx.translate(-r * 0.82, 0);
-    ctx.rotate(wag);
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(-r * 0.86, -r * 0.58);
-    ctx.quadraticCurveTo(-r * 0.62, 0, -r * 0.86, r * 0.58);
-    ctx.closePath();
-    ctx.fillStyle = finC;
-    ctx.fill();
-    ctx.restore();
-
-    ctx.beginPath();
-    ctx.moveTo(-r * 0.1, -r * 0.42);
-    ctx.quadraticCurveTo(r * 0.1, -r * 0.95, r * 0.42, -r * 0.36);
-    ctx.closePath();
-    ctx.fillStyle = finC;
-    ctx.fill();
-
-    ctx.beginPath();
-    ctx.moveTo(-r * 0.05, r * 0.34);
-    ctx.quadraticCurveTo(r * 0.05, r * 0.72, r * 0.38, r * 0.3);
-    ctx.closePath();
-    ctx.fillStyle = finC;
-    ctx.fill();
-
-    const bg = ctx.createLinearGradient(0, -r * 0.5, 0, r * 0.5);
-    bg.addColorStop(0, `hsl(${f.hue}, ${sat + 8}%, ${light + 14}%)`);
-    bg.addColorStop(1, body);
-    ctx.beginPath();
-    ctx.ellipse(0, 0, r * 1.06, r * 0.62, 0, 0, 6.2832);
-    ctx.fillStyle = bg;
-    ctx.fill();
-
-    ctx.beginPath();
-    ctx.ellipse(-r * 0.12, -r * 0.16, r * 0.42, r * 0.22, -0.25, 0, 6.2832);
-    ctx.fillStyle = 'rgba(255,255,255,.16)';
-    ctx.fill();
-
-    const ex = r * 0.6, ey = -r * 0.13;
-    ctx.beginPath();
-    ctx.arc(ex, ey, r * 0.15, 0, 6.2832);
-    ctx.fillStyle = '#fff';
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(ex + r * 0.04, ey, r * 0.075, 0, 6.2832);
-    ctx.fillStyle = '#08222e';
-    ctx.fill();
-
-    ctx.beginPath();
-    ctx.arc(r * 0.95, r * 0.06, r * 0.11, 0.4, 1.55);
-    ctx.strokeStyle = 'rgba(10,40,55,.5)';
-    ctx.lineWidth = Math.max(1, r * 0.05);
-    ctx.stroke();
-  }
-
-  // 鲨鱼：尖吻、竖新月尾、大背鳍
-  function drawShark(f, r, sat, light) {
-    const hue = (f.hue + 205) % 360;
-    const hs = Math.min(45, sat * 0.55);
-    const finC = `hsla(${hue}, ${hs}%, ${light - 16}%, .92)`;
-
-    // 尾鳍
-    ctx.save();
-    ctx.translate(-r * 0.9, 0);
-    ctx.rotate(Math.sin(f.hue + r) * 0.05);
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.quadraticCurveTo(-r * 0.5, -r * 1.0, -r * 0.7, -r * 0.22);
-    ctx.quadraticCurveTo(-r * 0.42, -r * 0.05, -r * 0.7, r * 0.72);
-    ctx.quadraticCurveTo(-r * 0.34, r * 0.4, 0, 0);
-    ctx.closePath();
-    ctx.fillStyle = finC;
-    ctx.fill();
-    ctx.restore();
-
-    // 背鳍
-    ctx.beginPath();
-    ctx.moveTo(-r * 0.22, -r * 0.4);
-    ctx.lineTo(r * 0.02, -r * 1.28);
-    ctx.lineTo(r * 0.46, -r * 0.3);
-    ctx.closePath();
-    ctx.fillStyle = finC;
-    ctx.fill();
-
-    // 胸鳍
-    ctx.beginPath();
-    ctx.moveTo(r * 0.16, r * 0.26);
-    ctx.quadraticCurveTo(-r * 0.12, r * 0.95, r * 0.44, r * 0.4);
-    ctx.closePath();
-    ctx.fillStyle = finC;
-    ctx.fill();
-
-    // 身体
-    const bg = ctx.createLinearGradient(0, -r * 0.55, 0, r * 0.55);
-    bg.addColorStop(0, `hsl(${hue}, ${hs}%, ${light + 10}%)`);
-    bg.addColorStop(0.55, `hsl(${hue}, ${hs}%, ${light}%)`);
-    bg.addColorStop(1, `hsl(${hue}, ${hs}%, ${light - 12}%)`);
-    ctx.beginPath();
-    ctx.moveTo(r * 1.32, r * 0.02);
-    ctx.quadraticCurveTo(r * 0.55, -r * 0.6, -r * 0.3, -r * 0.5);
-    ctx.quadraticCurveTo(-r * 1.02, -r * 0.3, -r * 1.0, 0);
-    ctx.quadraticCurveTo(-r * 1.02, r * 0.3, -r * 0.3, r * 0.5);
-    ctx.quadraticCurveTo(r * 0.55, r * 0.6, r * 1.32, r * 0.02);
-    ctx.closePath();
-    ctx.fillStyle = bg;
-    ctx.fill();
-
-    // 白肚
-    ctx.beginPath();
-    ctx.ellipse(r * 0.08, r * 0.26, r * 0.72, r * 0.16, 0, 0, 6.2832);
-    ctx.fillStyle = 'rgba(238,248,255,.55)';
-    ctx.fill();
-
-    // 鳃裂
-    ctx.strokeStyle = 'rgba(8,34,46,.35)';
-    ctx.lineWidth = Math.max(1, r * 0.045);
-    for (let i = 0; i < 3; i++) {
-      ctx.beginPath();
-      ctx.moveTo(r * (0.42 - i * 0.13), -r * 0.18);
-      ctx.quadraticCurveTo(r * (0.34 - i * 0.13), 0, r * (0.44 - i * 0.13), r * 0.16);
-      ctx.stroke();
-    }
-
-    // 眼睛
-    ctx.beginPath();
-    ctx.arc(r * 0.74, -r * 0.15, r * 0.1, 0, 6.2832);
-    ctx.fillStyle = '#fff';
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(r * 0.76, -r * 0.15, r * 0.055, 0, 6.2832);
-    ctx.fillStyle = '#07222e';
-    ctx.fill();
-
-    // 嘴
-    ctx.beginPath();
-    ctx.moveTo(r * 1.12, r * 0.16);
-    ctx.quadraticCurveTo(r * 0.86, r * 0.3, r * 0.6, r * 0.2);
-    ctx.strokeStyle = 'rgba(8,34,46,.45)';
-    ctx.lineWidth = Math.max(1, r * 0.05);
-    ctx.stroke();
-  }
-
-  // 小丑鱼：橙底三条白纹、圆鳍带黑边，爱在中层穿梭
-  function drawClown(f, s, r, sat, light, wag) {
-    const orange = 'hsl(22, 92%, 60%)';
-    const orangeD = 'hsl(16, 88%, 50%)';
-    const ink = 'rgba(18, 26, 34, .85)';
-    const lw = Math.max(1.2, r * 0.085);
-
-    // 尾鳍
-    ctx.save();
-    ctx.translate(-r * 0.9, 0);
-    ctx.rotate(wag);
-    ctx.beginPath();
-    ctx.ellipse(-r * 0.26, 0, r * 0.4, r * 0.46, 0, 0, 6.2832);
-    ctx.fillStyle = orangeD;
-    ctx.fill();
-    ctx.lineWidth = lw;
-    ctx.strokeStyle = ink;
-    ctx.stroke();
-    ctx.restore();
-
-    // 背鳍
-    ctx.beginPath();
-    ctx.moveTo(-r * 0.3, -r * 0.36);
-    ctx.quadraticCurveTo(0, -r * 0.95, r * 0.42, -r * 0.34);
-    ctx.closePath();
-    ctx.fillStyle = orangeD;
-    ctx.fill();
-    ctx.lineWidth = lw;
-    ctx.strokeStyle = ink;
-    ctx.stroke();
-
-    // 腹鳍
-    ctx.beginPath();
-    ctx.moveTo(-r * 0.22, r * 0.32);
-    ctx.quadraticCurveTo(r * 0.02, r * 0.82, r * 0.36, r * 0.3);
-    ctx.closePath();
-    ctx.fillStyle = orangeD;
-    ctx.fill();
-    ctx.stroke();
-
-    // 身体
-    const bg = ctx.createLinearGradient(0, -r * 0.55, 0, r * 0.55);
-    bg.addColorStop(0, 'hsl(28, 96%, 68%)');
-    bg.addColorStop(1, orangeD);
-    ctx.save();
-    ctx.beginPath();
-    ctx.ellipse(0, 0, r * 1.0, r * 0.6, 0, 0, 6.2832);
-    ctx.fillStyle = bg;
-    ctx.fill();
-    ctx.clip();
-
-    // 三条白纹（靠近头部的最宽）
-    const bands = [
-      { x: r * 0.56, w: r * 0.2, tilt: -0.18 },
-      { x: r * 0.02, w: r * 0.27, tilt: 0.05 },
-      { x: -r * 0.56, w: r * 0.17, tilt: 0.2 },
-    ];
-    for (const b of bands) {
-      ctx.save();
-      ctx.translate(b.x, 0);
-      ctx.rotate(b.tilt);
-      ctx.fillStyle = 'rgba(255, 252, 245, .97)';
-      ctx.fillRect(-b.w / 2, -r * 0.75, b.w, r * 1.5);
-      ctx.strokeStyle = 'rgba(18, 26, 34, .55)';
-      ctx.lineWidth = Math.max(1, r * 0.04);
-      ctx.beginPath();
-      ctx.moveTo(-b.w / 2, -r * 0.75);
-      ctx.lineTo(-b.w / 2, r * 0.75);
-      ctx.moveTo(b.w / 2, -r * 0.75);
-      ctx.lineTo(b.w / 2, r * 0.75);
-      ctx.stroke();
-      ctx.restore();
-    }
-    ctx.restore();
-
-    // 身体轮廓
-    ctx.beginPath();
-    ctx.ellipse(0, 0, r * 1.0, r * 0.6, 0, 0, 6.2832);
-    ctx.lineWidth = lw;
-    ctx.strokeStyle = ink;
-    ctx.stroke();
-
-    // 眼睛
-    ctx.beginPath();
-    ctx.arc(r * 0.64, -r * 0.14, r * 0.16, 0, 6.2832);
-    ctx.fillStyle = '#fff';
-    ctx.fill();
-    ctx.lineWidth = Math.max(1, r * 0.045);
-    ctx.strokeStyle = ink;
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(r * 0.67, -r * 0.14, r * 0.08, 0, 6.2832);
-    ctx.fillStyle = '#0b1c24';
-    ctx.fill();
-
-    // 嘴
-    ctx.beginPath();
-    ctx.arc(r * 0.92, r * 0.08, r * 0.1, 0.5, 1.5);
-    ctx.strokeStyle = 'rgba(40,26,16,.55)';
-    ctx.lineWidth = Math.max(1, r * 0.05);
-    ctx.stroke();
-  }
-
-  // 小虾：分节小身子、长触须、细步足，贴在缸底
-  function drawShrimp(f, r, sat, light) {
-    const c1 = `hsl(${f.hue}, ${sat}%, ${light + 14}%)`;
-    const c2 = `hsl(${f.hue}, ${sat}%, ${light - 4}%)`;
-    const line = `hsla(${f.hue}, ${sat}%, ${light}%, .85)`;
-
-    // 尾扇
-    ctx.save();
-    ctx.translate(-r * 1.15, 0);
-    for (let i = -1; i <= 1; i++) {
-      ctx.beginPath();
-      ctx.ellipse(-r * 0.12, i * r * 0.16, r * 0.3, r * 0.11, i * 0.55, 0, 6.2832);
-      ctx.fillStyle = c2;
-      ctx.fill();
-    }
-    ctx.restore();
-
-    // 身体分节
-    for (let i = 0; i < 5; i++) {
-      const px = -r * 0.88 + i * r * 0.34;
-      const py = Math.sin(i * 0.9) * r * 0.05;
-      const rad = r * (0.15 + i * 0.045);
-      ctx.beginPath();
-      ctx.ellipse(px, py, rad * 1.1, rad, 0, 0, 6.2832);
-      ctx.fillStyle = i % 2 ? c2 : c1;
-      ctx.fill();
-    }
-
-    // 头胸甲
-    ctx.beginPath();
-    ctx.ellipse(r * 0.66, 0, r * 0.4, r * 0.3, 0.08, 0, 6.2832);
-    ctx.fillStyle = c1;
-    ctx.fill();
-
-    // 眼睛
-    ctx.beginPath();
-    ctx.arc(r * 0.84, -r * 0.12, r * 0.09, 0, 6.2832);
-    ctx.fillStyle = '#08222e';
-    ctx.fill();
-
-    // 长触须
-    ctx.beginPath();
-    ctx.moveTo(r * 0.92, -r * 0.08);
-    ctx.quadraticCurveTo(r * 1.7, -r * 0.66, r * 2.05, -r * 0.2);
-    ctx.moveTo(r * 0.92, 0);
-    ctx.quadraticCurveTo(r * 1.6, r * 0.24, r * 1.98, r * 0.04);
-    ctx.strokeStyle = line;
-    ctx.lineWidth = Math.max(0.8, r * 0.055);
-    ctx.stroke();
-
-    // 步足
-    ctx.strokeStyle = line;
-    for (let i = 0; i < 3; i++) {
-      ctx.beginPath();
-      ctx.moveTo(r * 0.34 - i * r * 0.26, r * 0.2);
-      ctx.lineTo(r * 0.3 - i * r * 0.26, r * 0.52);
-      ctx.lineWidth = Math.max(0.7, r * 0.045);
-      ctx.stroke();
-    }
-  }
-
-  // 砗磲：两片扇形壳，上壳随 s.gape 一开一合
-  function drawClam(f, s, r, sat, light) {
-    const gape = Math.max(0, Math.min(0.85, (s.gape || 0) * 0.9));
-    const shell = `hsl(${f.hue}, ${Math.min(48, sat)}%, ${light}%)`;
-    const shellD = `hsl(${f.hue}, ${Math.min(48, sat)}%, ${light - 16}%)`;
-    const lip = `hsla(${(f.hue + 320) % 360}, 55%, 72%, .9)`;
-
-    drawShadow(r * 1.1);
-
-    // 下壳
-    ctx.beginPath();
-    ctx.ellipse(0, r * 0.28, r * 1.0, r * 0.46, 0, 0, Math.PI);
-    ctx.fillStyle = shellD;
-    ctx.fill();
-
-    // 里肉
-    ctx.beginPath();
-    ctx.ellipse(0, r * 0.16, r * 0.76, r * 0.22, 0, 0, Math.PI);
-    ctx.fillStyle = lip;
-    ctx.fill();
-
-    // 上壳：绕左侧铰链旋转
-    ctx.save();
-    ctx.translate(-r * 0.92, r * 0.1);
-    ctx.rotate(-gape);
-    ctx.translate(r * 0.92, -r * 0.1);
-    ctx.beginPath();
-    ctx.ellipse(0, -r * 0.06, r * 1.0, r * 0.58, 0, Math.PI, 0);
-    ctx.fillStyle = shell;
-    ctx.fill();
-    // 放射纹
-    ctx.save();
-    ctx.beginPath();
-    ctx.ellipse(0, -r * 0.06, r * 1.0, r * 0.58, 0, Math.PI, 0);
-    ctx.clip();
-    ctx.strokeStyle = 'rgba(0,0,0,.13)';
-    ctx.lineWidth = Math.max(1, r * 0.045);
-    for (let i = -4; i <= 4; i++) {
-      ctx.beginPath();
-      ctx.moveTo(0, -r * 0.05);
-      ctx.lineTo(i * r * 0.24, -r * 0.68);
-      ctx.stroke();
-    }
-    ctx.restore();
-    ctx.restore();
-  }
-
   /* ------------------------------------------------------------ 交互 */
 
   // 拖拽：按住鱼跟着指针走；点鱼不再喂食，喂食只在右侧「我的鱼」列表里触发
   let drag = null;      // {id, ox, oy, moved, px, py}
+  let topSeq = 0;       // 拖动置顶序号：拖动过的鱼 layer 设为 TOP_BASE + 序号，永远画在未拖动的鱼前面
+  const TOP_BASE = 1e9; // 远高于普通鱼的 layer（初始 y，范围 0~H）
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
   function localPos(e) {
@@ -1312,6 +1517,7 @@
       if (s) {
         s.hold = 1.2;                // 松手后先原地停留，不要立刻游走
         s.tx = s.x; s.ty = s.y;
+        s.layer = TOP_BASE + (++topSeq);  // 拖动过的鱼固定置顶，放开后依然画在最前；最后拖的在最前
       }
       if (!drag.moved) toast('按住鱼可以拖动它；喂食请点右侧「我的鱼」', 2400);
       drag = null;

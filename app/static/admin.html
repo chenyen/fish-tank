@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>中后台管理 · 虚拟养鱼</title>
+<link rel="stylesheet" href="/static/style.css" />
+<link rel="stylesheet" href="/static/admin.css" />
+</head>
+<body class="adminBody">
+
+<!-- 管理员登录 -->
+<section id="login" class="screen">
+  <div class="card">
+    <h1>中后台管理</h1>
+    <p class="sub">鱼缸运行参数 · 管理员登录</p>
+    <div class="field">
+      <label>管理员账号</label>
+      <input id="adUser" type="text" value="admin" autocomplete="username" />
+    </div>
+    <div class="field">
+      <label>密码</label>
+      <input id="adPwd" type="password" placeholder="初始密码见 README" autocomplete="current-password" />
+    </div>
+    <button id="adLogin" class="btn full">登录后台</button>
+    <div id="loginHint" class="hint"></div>
+    <a class="adminLink" href="/">← 返回鱼缸</a>
+  </div>
+</section>
+
+<!-- 控制台 -->
+<section id="console" class="screen hidden">
+  <header class="adHead">
+    <span class="brand">中后台管理</span>
+    <span class="pill" id="adWho">admin</span>
+    <span class="spacer"></span>
+    <button id="btnPwd" class="btn ghost small" type="button">修改密码</button>
+    <button id="btnOut" class="btn ghost small" type="button">退出</button>
+  </header>
+
+  <main class="adWrap">
+    <section class="adCard">
+      <h2>全局运行参数 <span class="tag">保存即生效</span></h2>
+      <p class="adHint">
+        这些参数原先写死在 <code>game.py</code> 顶部，现在统一由后台配置并持久化到数据库；
+        保存后无需重启服务，前台下一次刷新状态时按新配置结算。
+      </p>
+      <div id="paramGrid" class="paramGrid"></div>
+      <div class="adActions">
+        <button id="btnSave" class="btn" type="button">保存全部</button>
+        <button id="btnReset" class="btn ghost" type="button">恢复出厂值</button>
+        <span id="saveHint" class="hint"></span>
+      </div>
+    </section>
+
+    <section class="adCard">
+      <h2>鱼种参数 <span class="tag">可增删 · 可选外观</span></h2>
+      <p class="adHint">
+        名称 / 价格 / 体型系数 / 产币系数 / 描述均可调整，也可新增鱼种。
+        「标识」是数据库与外观识别的 key（小写字母开头，字母数字下划线）；
+        「外观造型」决定这条鱼在鱼缸里的样子和游动方式，可从下方造型库挑选。
+        删除仍在被鱼使用的鱼种时，会自动改为「下架」——不再出现在购买列表，已有的鱼不受影响。
+      </p>
+      <div class="lookLibrary">
+        <div class="lookLibHead">
+          <div><b>外观造型库</b><span>点击造型设为新增鱼种的默认外观，保存后前台按所选造型绘制</span></div>
+          <span class="lookPickTip" id="lookPickTip">新增默认：鲤鱼</span>
+        </div>
+        <div class="lookGallery" id="lookGallery"></div>
+      </div>
+      <div class="tableWrap">
+        <table class="adTable" id="spTable">
+          <thead>
+            <tr>
+              <th>标识</th>
+              <th>名称</th>
+              <th>外观造型</th>
+              <th>价格(币)</th>
+              <th>体型系数</th>
+              <th>产币系数</th>
+              <th>描述</th>
+              <th>上架</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="adActions">
+        <button id="btnAddSp" class="btn ghost" type="button">+ 新增鱼种</button>
+        <button id="btnSave2" class="btn" type="button">保存全部</button>
+        <span id="saveHint2" class="hint"></span>
+      </div>
+    </section>
+  </main>
+</section>
+
+<!-- 修改密码 -->
+<div id="pwdOverlay" class="overlay hidden">
+  <div class="card">
+    <h1>修改管理员密码</h1>
+    <p class="sub">修改后立即生效，下次登录使用新密码</p>
+    <div class="field">
+      <label>原密码</label>
+      <input id="oldPwd" type="password" autocomplete="current-password" />
+    </div>
+    <div class="field">
+      <label>新密码（至少 6 位）</label>
+      <input id="newPwd" type="password" autocomplete="new-password" />
+    </div>
+    <div class="field">
+      <label>再次输入新密码</label>
+      <input id="newPwd2" type="password" autocomplete="new-password" />
+    </div>
+    <button id="pwdOk" class="btn full" type="button">确认修改</button>
+    <button id="pwdCancel" class="btn full ghost" type="button">取消</button>
+    <div id="pwdHint" class="hint"></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<script src="/static/fish-art.js"></script>
+<script src="/static/admin.js"></script>
+</body>
+</html>

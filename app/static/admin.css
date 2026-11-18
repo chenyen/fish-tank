@@ -1,0 +1,473 @@
+/* 中后台管理 - 与前台一致的深色玻璃风格 */
+body.adminBody {
+  overflow: auto;
+  background: radial-gradient(120% 90% at 50% 0%, #12506b 0%, var(--deep2) 45%, var(--deep) 100%);
+}
+
+#login {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.adminLink {
+  display: inline-block;
+  margin-top: 14px;
+  font-size: 12px;
+  color: rgba(143, 179, 199, .8);
+  text-decoration: none;
+  letter-spacing: .5px;
+  transition: color .2s;
+}
+
+.adminLink:hover { color: var(--aqua); }
+
+/* ---------------- 控制台 ---------------- */
+#console {
+  position: static;
+  inset: auto;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.adHead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 20px;
+  background: rgba(4, 24, 34, .82);
+  border-bottom: 1px solid var(--line);
+  backdrop-filter: blur(12px);
+}
+
+.adHead .brand {
+  font-size: 16px;
+  letter-spacing: 3px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.adHead .spacer { flex: 1; }
+
+.adHead .pill {
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, .06);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.adWrap {
+  flex: 1;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px 20px 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.adCard {
+  background: rgba(4, 24, 34, .72);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 18px 20px 20px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, .28);
+}
+
+.adCard h2 {
+  margin: 0 0 6px;
+  font-size: 15px;
+  letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.adCard h2 .tag {
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: #0a2b38;
+  background: var(--aqua);
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+
+.adHint {
+  margin: 0 0 14px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+/* 参数网格 */
+.paramGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 14px;
+}
+
+.pGroup {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  color: #7fa0b3;
+  padding-bottom: 2px;
+  border-bottom: 1px solid rgba(255, 255, 255, .08);
+  margin-top: 2px;
+}
+
+.pGroup:first-child { margin-top: 0; }
+
+.pField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border-radius: 13px;
+  background: rgba(255, 255, 255, .04);
+  border: 1px solid rgba(255, 255, 255, .07);
+  transition: border-color .2s, background .2s;
+}
+
+.pField:focus-within {
+  border-color: rgba(75, 224, 200, .55);
+  background: rgba(75, 224, 200, .07);
+}
+
+.pField label {
+  font-size: 12.5px;
+  color: #cfe6f2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.pField label i {
+  font-style: normal;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.pField .row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pField input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, .16);
+  background: rgba(2, 14, 20, .55);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+
+.pField input:focus { outline: none; border-color: var(--aqua); }
+
+.pField .unit { font-size: 11.5px; color: var(--muted); min-width: 26px; }
+
+.pField .phint {
+  font-size: 11px;
+  line-height: 1.5;
+  color: rgba(143, 179, 199, .85);
+}
+
+/* 外观造型库 */
+.lookLibrary {
+  margin: 0 0 16px;
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .035);
+  border: 1px solid rgba(255, 255, 255, .08);
+}
+
+.lookLibHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.lookLibHead > div { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.lookLibHead b { font-size: 12.5px; color: #d8eef8; }
+.lookLibHead span { font-size: 11px; color: var(--muted); }
+
+.lookPickTip {
+  flex: 0 0 auto;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(75, 224, 200, .38);
+  background: rgba(75, 224, 200, .1);
+  color: #8ff0df !important;
+}
+
+.lookGallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(122px, 1fr));
+  gap: 10px;
+}
+
+.lookCard {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, .1);
+  background: rgba(2, 14, 20, .42);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color .18s, background .18s, transform .18s;
+}
+
+.lookCard:hover { transform: translateY(-2px); border-color: rgba(75, 224, 200, .45); }
+
+.lookCard.on {
+  border-color: rgba(75, 224, 200, .9);
+  background: rgba(75, 224, 200, .12);
+  box-shadow: 0 0 0 1px rgba(75, 224, 200, .25) inset;
+}
+
+.lookCanvas {
+  width: 100%;
+  height: 62px;
+  border-radius: 9px;
+  display: block;
+}
+
+.lookMeta { display: flex; flex-direction: column; gap: 2px; }
+.lookMeta b { font-size: 11.5px; font-weight: 600; color: #d8eef8; }
+.lookMeta i { font-style: normal; font-size: 10px; line-height: 1.35; color: var(--muted); }
+
+/* 鱼种表 */
+.tableWrap {
+  overflow-x: auto;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, .08);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(75, 224, 200, .42) rgba(255, 255, 255, .05);
+}
+
+.tableWrap::-webkit-scrollbar { height: 6px; width: 6px; }
+.tableWrap::-webkit-scrollbar-track { background: rgba(255, 255, 255, .05); border-radius: 999px; }
+.tableWrap::-webkit-scrollbar-thumb { background: rgba(75, 224, 200, .38); border-radius: 999px; }
+.tableWrap::-webkit-scrollbar-thumb:hover { background: rgba(75, 224, 200, .68); }
+
+.adTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+  min-width: 1080px;
+}
+
+.adTable th {
+  text-align: left;
+  padding: 10px 10px;
+  font-weight: 600;
+  color: var(--muted);
+  font-size: 11.5px;
+  letter-spacing: .5px;
+  white-space: nowrap;
+  background: rgba(255, 255, 255, .05);
+}
+
+.adTable td {
+  padding: 8px 10px;
+  border-top: 1px solid rgba(255, 255, 255, .07);
+  vertical-align: middle;
+}
+
+.adTable tr:hover td { background: rgba(75, 224, 200, .05); }
+
+.adTable input[type="text"],
+.adTable input[type="number"] {
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, .14);
+  background: rgba(2, 14, 20, .55);
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+}
+
+.adTable input:focus { outline: none; border-color: var(--aqua); }
+.adTable input:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+  background: rgba(2, 14, 20, .3);
+}
+
+.adTable .colKey input { width: 96px; font-family: ui-monospace, Menlo, Consolas, monospace; }
+.adTable .colName input { min-width: 90px; }
+.adTable .colNum input { width: 74px; }
+.adTable .colDesc input { min-width: 200px; }
+.adTable .colOn { text-align: center; }
+.adTable .colDel { text-align: center; }
+
+.lookCell { display: flex; align-items: center; gap: 8px; }
+.lookThumb {
+  width: 96px;
+  height: 52px;
+  flex: 0 0 auto;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, .12);
+  display: block;
+}
+
+.adTable select[data-f="look"] {
+  min-width: 104px;
+  max-width: 128px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, .14);
+  background: rgba(2, 14, 20, .55);
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+}
+
+.adTable select[data-f="look"]:focus { outline: none; border-color: var(--aqua); }
+
+.usedTag {
+  display: inline-block;
+  margin-left: 4px;
+  font-size: 10.5px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.spDel {
+  border: 1px solid rgba(255, 120, 120, .45);
+  background: rgba(255, 90, 90, .12);
+  color: #ffb3b3;
+  border-radius: 8px;
+  padding: 4px 9px;
+  font-size: 11.5px;
+  cursor: pointer;
+  transition: background .2s;
+}
+
+.spDel:hover { background: rgba(255, 90, 90, .28); }
+
+.adActions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+.adActions .hint { font-size: 12px; }
+
+/* 提示条：深色磨砂玻璃（顶部居中，层级高于弹窗） */
+#toast {
+  position: fixed;
+  top: 24px;
+  left: 50%;
+  right: auto;
+  bottom: auto;
+  transform: translateX(-50%) translateY(-8px);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(520px, calc(100vw - 32px));
+  box-sizing: border-box;
+  padding: 12px 18px;
+  border-radius: 12px;
+  background: rgba(12, 28, 38, .82);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, .14);
+  color: #e8f6ff;
+  font-size: 13px;
+  line-height: 1.4;
+  white-space: normal;
+  text-align: left;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, .45);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 220ms cubic-bezier(.2, .8, .2, 1),
+              transform 220ms cubic-bezier(.2, .8, .2, 1),
+              visibility 0s linear 220ms;
+  z-index: 9999;
+}
+
+#toast.show {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+  transition: opacity 220ms cubic-bezier(.2, .8, .2, 1),
+              transform 220ms cubic-bezier(.2, .8, .2, 1),
+              visibility 0s linear 0s;
+}
+
+#toast .toastIcon {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  background: rgba(64, 200, 180, .18);
+  color: #4fd6c0;
+  border: 1px solid rgba(79, 214, 192, .42);
+}
+
+#toast .toastText { flex: 1 1 auto; }
+
+#toast.toast--success { border-color: rgba(79, 214, 192, .38); }
+
+#toast.toast--error { border-color: rgba(255, 107, 107, .42); }
+
+#toast.toast--error .toastIcon {
+  background: rgba(255, 107, 107, .16);
+  color: #ff6b6b;
+  border-color: rgba(255, 107, 107, .42);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #toast, #toast.show { transition-duration: 1ms; }
+}
+
+textarea.spDescBox {
+  width: 100%;
+  min-height: 34px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, .14);
+  background: rgba(2, 14, 20, .55);
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  resize: vertical;
+}
+
+textarea.spDescBox:focus { outline: none; border-color: var(--aqua); }
+
+#pwdOverlay .card { max-width: 360px; }
+#pwdOverlay .card h1 { font-size: 19px; letter-spacing: 1px; }

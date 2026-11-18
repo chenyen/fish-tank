@@ -5,6 +5,8 @@ import sqlite3
 import time
 from contextlib import contextmanager
 
+import config
+
 DB_PATH = os.environ.get("DB_PATH", "/data/tank.db")
 
 SCHEMA = """
@@ -58,6 +60,8 @@ def init_db() -> None:
     with connect() as conn:
         conn.executescript(SCHEMA)
         _migrate(conn)
+        # 后台参数表 + 默认鱼种 + 管理员账号（首次启动种子数据）
+        config.ensure_seed(conn)
 
 
 def _migrate(conn) -> None:

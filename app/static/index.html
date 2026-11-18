@@ -4,6 +4,14 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>虚拟养鱼</title>
+<script>
+  /* 首屏前先落地已保存的界面风格，避免刷新时闪一下默认配色 */
+  try {
+    if (localStorage.getItem('fishTank.theme') === 'cartoon') {
+      document.documentElement.dataset.theme = 'cartoon';
+    }
+  } catch (e) { }
+</script>
 <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
@@ -30,6 +38,7 @@
 
     <button id="submitAuth" class="btn full">进入鱼缸</button>
     <div id="authHint" class="hint"></div>
+    <a class="adminLink" href="/admin">中后台管理 →</a>
   </div>
 </section>
 
@@ -37,11 +46,33 @@
 <section id="game" class="screen hidden">
   <header>
     <span class="brand" id="brandTitle" title="点击修改鱼缸名">AQUARIUM</span>
-    <span class="pill gold" title="已入账金币"><span>🪙</span><b id="coins">0</b><i id="pending">+0.0</i></span>
-    <span class="pill clock" title="下次整点结算倒计时"><span>⏳</span><b id="clock">--:--</b></span>
-    <span class="pill feed" title="饲料不设上限"><span>🌾</span><b id="food">0</b></span>
+      <span class="pill gold" title="已入账金币"><svg class="pillIcon coinIcon" viewBox="0 0 24 24" aria-hidden="true"><circle class="coinBody" cx="12" cy="12" r="9"/><circle class="coinRing" cx="12" cy="12" r="6.3"/><path class="coinMark" d="M14.7 8.4c-.7-.8-1.7-1.2-2.9-1.2-1.6 0-2.7.8-2.7 2 0 2.9 5.8 1.1 5.8 4.2 0 1.3-1.2 2.2-3 2.2-1.2 0-2.3-.4-3-1.2"/></svg><b id="coins">0</b><i id="pending">+0.0</i></span>
+      <span class="pill feed" title="饲料不设上限"><svg class="pillIcon feedIcon" viewBox="0 0 24 24" aria-hidden="true"><path class="stalk" d="M12 21V6.5"/><g class="grain"><ellipse cx="12" cy="5.3" rx="1.5" ry="2.5"/><ellipse cx="9.1" cy="7.6" rx="1.4" ry="2.5" transform="rotate(-42 9.1 7.6)"/><ellipse cx="14.9" cy="7.6" rx="1.4" ry="2.5" transform="rotate(42 14.9 7.6)"/><ellipse cx="9.5" cy="11.5" rx="1.3" ry="2.3" transform="rotate(-42 9.5 11.5)"/><ellipse cx="14.5" cy="11.5" rx="1.3" ry="2.3" transform="rotate(42 14.5 11.5)"/></g></svg><b id="food">0</b></span>
     <span class="spacer"></span>
-    <span id="who"></span>
+    <div class="userMenu" id="userMenu">
+      <button id="userBtn" class="userBtn" type="button" title="切换界面风格" aria-haspopup="menu" aria-expanded="false">
+        <span id="who"></span>
+        <svg class="caret" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
+      </button>
+      <div id="themeMenu" class="themeMenu hidden" role="menu" aria-label="界面风格">
+        <div class="themeMenuTitle">界面风格</div>
+        <button class="themeItem" type="button" role="menuitemradio" data-theme="deep">
+          <span class="sw sw-deep"></span>
+          <span class="tx">经典深海</span>
+          <svg class="tick" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 13l4 4L19 7" /></svg>
+        </button>
+        <button class="themeItem" type="button" role="menuitemradio" data-theme="cartoon">
+          <span class="sw sw-cartoon"></span>
+          <span class="tx">明亮卡通</span>
+          <svg class="tick" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 13l4 4L19 7" /></svg>
+        </button>
+      </div>
+    </div>
+    <div class="dock">
+      <button id="btnFish" class="btn small">买鱼苗</button>
+      <button id="btnFood" class="btn ghost small">买饲料</button>
+      <button id="btnBoard" class="btn ghost small">排行榜</button>
+    </div>
     <button id="logout" class="btn ghost small">退出</button>
   </header>
 
@@ -49,21 +80,27 @@
     <canvas id="tank"></canvas>
     <div id="toast"></div>
     <aside id="panel">
-      <h3>我的鱼 · <span id="income">0</span> 币/时</h3>
+      <h3 id="panelHead" class="panelHead" title="点击折叠 / 展开「我的鱼」">
+        <span class="phLeft">
+          <button id="foldToggle" class="foldToggle" type="button" aria-label="折叠或展开我的鱼" aria-expanded="true" tabindex="-1">
+            <svg class="foldArrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6" /></svg>
+          </button>
+          <span class="phTitle">我的鱼 · <span id="income">0</span> 币/时</span>
+        </span>
+        <span class="phRight">
+          <span class="fishCount" id="fishCount"></span>
+          <button id="btnFeedAll" class="btn ghost small feedAll" title="把饱食不高于 80% 的鱼喂到 80% 以上">一键投喂</button>
+        </span>
+      </h3>
       <div class="panelhint">点卡片喂食 · 点鱼名改名</div>
       <div id="fishList"></div>
       <div id="foodTimer" class="empty"></div>
     </aside>
     <div id="tip">按住鱼可拖动位置 · 点顶部标题可改鱼缸名 · 喂食请点右侧「我的鱼」</div>
   </div>
-
-  <div class="dock">
-    <button id="btnFish" class="btn">买鱼苗</button>
-    <button id="btnFood" class="btn ghost">换饲料 x5 · 8</button>
-    <button id="btnBoard" class="btn ghost">排行榜</button>
-  </div>
 </section>
 
+<script src="/static/fish-art.js"></script>
 <script src="/static/app.js"></script>
 </body>
 </html>

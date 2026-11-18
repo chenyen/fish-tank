@@ -18,3 +18,8 @@ Thumbs.db
 
 # 日志
 *.log
+logs/
+
+# 项目数据与临时备份
+.workbuddy/
+*.bak*
