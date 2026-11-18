@@ -175,6 +175,79 @@ fish-tank/
 | POST | `/api/admin/config` | 保存参数 `{params, species}`，即时生效，返回最新配置与提示 |
 | POST | `/api/admin/password` | 修改密码 `{old, new}` |
 
+## 生产自动更新（GHCR + 1Panel 轮询）
+
+代码和前端都打在镜像里，所以**改了代码的发版必须更新镜像 + 重启容器**才能生效
+（只在后台改参数不用，保存即生效）。数据在 `./data` 卷里，重建不会丢。
+
+发版链路：`git push` → GitHub Actions 自动构建镜像并推送到 GHCR → NAS 定时拉取，
+有新镜像才重建容器。NAS 上**不需要放源码**，只要 `docker-compose.yml`、`deploy/auto-update.sh` 和 `./data`。
+日志写在 `logs/auto-update.log`。
+
+### 首次准备（只需一次）
+
+1. **让 Actions 能推镜像**：GitHub 仓库 → Settings → Actions → General → Workflow permissions，
+   选「Read and write permissions」并保存（工作流已声明 `packages: write`）。
+2. **把 GHCR 包设为公开**（否则 NAS 拉取要登录）：推一次镜像后，
+   打开 <https://github.com/orgs/chenyen/packages> → 找到 `fish-tank` → Package settings →
+   Change visibility → Public。想保持私有也可以，见下方「私有镜像」。
+3. 在 NAS 上准备一个目录，放入两样东西：`docker-compose.yml`、`deploy/auto-update.sh`
+   （`./data` 留空即可，首次启动会自动建库）。
+4. 给脚本执行权限：在 1Panel 终端里执行 `chmod +x deploy/auto-update.sh`。
+5. 首次部署：`docker compose up -d`，确认 `http://NAS_IP:8848` 能打开。
+
+> 之后每次 `git push`，最多等一个轮询周期就自动更新，NAS 上无需任何手动操作。
+> 前端资源带 mtime 版本号，更新后浏览器会自动拉新，不用手动清缓存。
+
+### 在 1Panel 里配置计划任务（图形界面）
+
+1. 打开 1Panel → 左侧「计划任务」→「创建任务」。
+2. 任务类型选 **Shell 脚本**。
+3. 任务名称随意，如 `鱼缸自动更新`。
+4. 执行周期按需要选，例如「每 10 分钟」或「每小时」。
+5. 脚本内容填下面这一行（路径换成你 NAS 上项目的实际路径）：
+
+   ```bash
+   bash /你的路径/fish-tank/deploy/auto-update.sh
+   ```
+
+6. 保存后，可在任务列表点「执行」手动测一次，再去 `logs/auto-update.log` 看结果。
+
+### 手动触发 / 立刻生效
+
+- 在 1Panel 计划任务里手动「执行」一次，或在终端运行 `bash deploy/auto-update.sh`。
+- 想完全不自动：不创建计划任务即可。
+- 想本地调试构建：把 compose 里的 `image:` 换回 `build: .` 再 `docker compose up -d --build`。
+
+### 私有镜像（可选）
+
+若 GHCR 包保持私有，NAS 需先登录一次（token 在 GitHub → Settings → Developer settings →
+Personal access tokens，勾选 `read:packages`）：
+
+```bash
+echo "<你的token>" | docker login ghcr.io -u chenyen --password-stdin
+```
+
+登录信息会持久保存，之后脚本可正常拉取。
+
+### 回滚到旧版本
+
+镜像同时打了 commit sha 标签。在 GHCR 的包页面复制某个旧 sha 标签，改 compose 的
+`image:` 为 `ghcr.io/chenyen/fish-tank:sha-xxxxxxx`，再 `docker compose up -d --force-recreate`；
+或直接 `docker compose pull` 让脚本重建。
+
+### 国内拉取慢 / 拉不动
+
+ghcr.io 在国内偶尔不稳定。若 NAS 拉取频繁失败，可改用阿里云容器镜像服务（ACR）做加速：
+把 Actions 的推送目标换成阿里云仓库，compose 的 `image:` 同步改成阿里云地址即可，
+更新脚本无需改动（它只认 compose 里的镜像）。
+
+### 注意事项
+
+- 更新失败（网络 / 拉取 / 重建 / 健康检查）都会写进 `logs/auto-update.log`，先查这里。
+- 健康检查访问 `127.0.0.1:8848`，若你改过端口，同步改脚本末尾的地址。
+- 脚本会清理悬空旧镜像（`docker image prune -f`），避免长期占满磁盘。
+
 ## 数据与安全
 
 - 数据落在 `./data/tank.db`（SQLite，WAL 模式），删除该目录即重置全部玩家数据。

@@ -9,7 +9,7 @@ import threading
 import time
 
 from fastapi import FastAPI, Request, Response, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -290,14 +290,42 @@ class AdminPwdReq(BaseModel):
 
 # ---------------------------------------------------------------- 页面
 
+def _page(name: str) -> HTMLResponse:
+    """返回页面，并给静态资源引用加 mtime 版本号。
+
+    部署更新后文件 mtime 变化，URL 跟着变，浏览器会重新拉取最新的 js/css，
+    避免用户因为缓存一直看到旧界面。无需手动维护版本号。
+    """
+    path = os.path.join(STATIC_DIR, name)
+    with open(path, "r", encoding="utf-8") as fh:
+        html = fh.read()
+
+    def stamp(match):
+        attr, url = match.group(1), match.group(2)
+        rel = url.lstrip("/").split("?")[0]
+        if rel.startswith("static/"):       # URL 里的 /static/ 前缀不属于 STATIC_DIR 内部路径
+            rel = rel[len("static/"):]
+        fp = os.path.join(STATIC_DIR, rel)
+        try:
+            version = int(os.path.getmtime(fp))
+        except OSError:
+            version = 0
+        sep = "&" if "?" in url else "?"
+        return f'{attr}="{url}{sep}v={version}"'
+
+    import re
+    html = re.sub(r'(src|href)="(/static/[^"]+)"', stamp, html)
+    return HTMLResponse(html, headers={"Cache-Control": "no-store"})
+
+
 @app.get("/")
 def index():
-    return FileResponse(os.path.join(STATIC_DIR, "index.html"))
+    return _page("index.html")
 
 
 @app.get("/admin")
 def admin_page():
-    return FileResponse(os.path.join(STATIC_DIR, "admin.html"))
+    return _page("admin.html")
 
 
 # ---------------------------------------------------------------- 玩家接口

@@ -1,7 +1,8 @@
 services:
   web:
-    build: .
-    image: fish-tank:1.0
+    # 镜像由 GitHub Actions 构建并推送，NAS 只负责拉取，不再本地 build。
+    # 想本地构建调试时，把下面这行的 image 换成 build: . 即可。
+    image: ghcr.io/chenyen/fish-tank:latest
     container_name: fish-tank
     restart: unless-stopped
     ports:
