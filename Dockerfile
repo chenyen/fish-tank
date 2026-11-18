@@ -13,6 +13,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app/ ./
 
 VOLUME ["/data"]
-EXPOSE 8000
+EXPOSE 8848
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8848", "--workers", "1"]
