@@ -330,7 +330,7 @@
       const sell = f.sell || {};
       const sellable = !!sell.sellable;
       const sellBar = sellable
-        ? `<div class="sellBar"><span class="sellVal" title="买价×倍率 ${sell.from_buy} + 饲料钱 ${sell.from_food}">可卖 <b>${fmtCoins(sell.price || 0)}</b> 金币</span><button class="sellBtn" type="button" data-id="${f.id}">卖出</button></div>`
+        ? `<div class="sellBar"><span class="sellVal" title="可获得 ${fmtCoins(sell.price || 0)} 金币">可卖 <b>${fmtCoins(sell.price || 0)}</b> 金币</span><button class="sellBtn" type="button" data-id="${f.id}">卖出</button></div>`
         : '';
       return `<div class="fishitem ${sellable ? 'is-max' : ''}" data-id="${f.id}" title="点击喂食">
         <div class="top"><b class="fname" data-id="${f.id}" title="点击给这条鱼改名">${esc(f.name)}</b><span class="topRight"><span class="gstate ${gs.key}" title="${esc(gsTip)}">${esc(gs.label)}${factorTxt}</span><span class="stag">${esc(f.species_name || '鱼苗')} · ${f.stage.name}</span></span></div>
@@ -374,11 +374,7 @@
     wrap.innerHTML = `<div class="card sellcard">
       <h1>卖出「${esc(f.name)}」</h1>
       <p class="sub">这条鱼已长成成鱼，确定要卖掉换金币吗？卖出后无法找回。</p>
-      <div class="sellDetail">
-        <div><span>鱼种买价 × ${s.mult} 倍</span><b>${fmtCoins(s.from_buy)}</b></div>
-        <div><span>养成饲料钱（${s.fed} 份）</span><b>${fmtCoins(s.from_food)}</b></div>
-        <div class="sellTotal"><span>到手金币</span><b>${fmtCoins(s.price)}</b></div>
-      </div>
+      <div class="sellAmount"><span>可获得</span><b>${fmtCoins(s.price)}</b><i>金币</i></div>
       <div class="sellActions">
         <button class="btn ghost" id="sellCancel" type="button">再养养</button>
         <button class="btn sellConfirm" id="sellConfirm" type="button">确认卖出</button>
