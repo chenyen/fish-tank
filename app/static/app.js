@@ -315,15 +315,10 @@
     }
     box.innerHTML = data.fish.map((f) => {
       const hunger = Math.round(f.hunger);
-      const growPct = Math.round(f.stage.progress * 100);
       const ageH = (f.age / 3600).toFixed(1);
-      const gs = f.growth_state || { key: 'normal', label: '正常', factor: 1, threshold: 0 };
-      const factorTxt = gs.factor && gs.factor !== 1 ? ` ×${gs.factor}` : '';
+      const maxed = !f.stage.next_name;          // 已达最高阶段
+      const growPct = Math.round(f.stage.progress * 100);
       const rateTxt = f.growth_per_hour ? ` · ${f.growth_per_hour}/时` : '';
-      const gsTip = gs.key === 'stop'
-        ? `饱食低于 ${gs.threshold}%，已停止成长，喂食后即恢复`
-        : `饱食 ≥ ${gs.threshold}% 时成长 ${gs.factor} 倍${
-          gs.next_threshold == null ? '（已是最高档）' : `（饱食到 ${gs.next_threshold}% 可再提速）`}`;
       const stageTxt = f.stage.next_name
         ? '距' + f.stage.next_name + ' ' + Math.max(0, Math.round(f.stage.next_at - f.growth))
         : '已满级';
@@ -332,10 +327,13 @@
       const sellBar = sellable
         ? `<div class="sellBar"><span class="sellVal" title="可获得 ${fmtCoins(sell.price || 0)} 金币">可卖 <b>${fmtCoins(sell.price || 0)}</b> 金币</span><button class="sellBtn" type="button" data-id="${f.id}">卖出</button></div>`
         : '';
+      // 满级后不再显示成长相关（成长进度/成长速率/距下一阶段）
+      const growBlock = maxed ? '' : `
+        <div class="bar grow"><i style="width:${growPct}%"></i></div>
+        <div class="meta"><span>成长 ${growPct}%${rateTxt}</span><span>${stageTxt}</span></div>`;
       return `<div class="fishitem ${sellable ? 'is-max' : ''}" data-id="${f.id}" title="点击喂食">
-        <div class="top"><b class="fname" data-id="${f.id}" title="点击给这条鱼改名">${esc(f.name)}</b><span class="topRight"><span class="gstate ${gs.key}" title="${esc(gsTip)}">${esc(gs.label)}${factorTxt}</span><span class="stag">${esc(f.species_name || '鱼苗')} · ${f.stage.name}</span></span></div>
-        <div class="bar grow ${gs.key}"><i style="width:${growPct}%"></i></div>
-        <div class="meta"><span>成长 ${growPct}%${rateTxt}</span><span>${stageTxt}</span></div>
+        <div class="top"><b class="fname" data-id="${f.id}" title="点击给这条鱼改名">${esc(f.name)}</b><span class="topRight"><span class="stag">${esc(f.species_name || '鱼苗')} · ${esc(f.stage.name)}</span></span></div>
+        ${growBlock}
         <div class="bar hunger"><i style="width:${hunger}%"></i></div>
         <div class="meta"><span>饱食 ${hunger}% · 已养 ${ageH}h</span><span>${f.coin_rate} 币/时${f.eff < 1 ? ' · 产能 ' + Math.round(f.eff * 100) + '%' : ''}</span></div>
         ${sellBar}
@@ -361,7 +359,7 @@
     });
   }
 
-  /* ------------------------------------------------------------ 卖出成鱼 */
+  /* ------------------------------------------------------------ 卖出满级鱼 */
 
   function askSellFish(id) {
     const f = state && state.fish.find((x) => x.id === id);
@@ -373,7 +371,7 @@
     wrap.className = 'overlay';
     wrap.innerHTML = `<div class="card sellcard">
       <h1>卖出「${esc(f.name)}」</h1>
-      <p class="sub">这条鱼已长成成鱼，确定要卖掉换金币吗？卖出后无法找回。</p>
+      <p class="sub">这条鱼已养到满级，确定要卖掉换金币吗？卖出后无法找回。</p>
       <div class="sellAmount"><span>可获得</span><b>${fmtCoins(s.price)}</b><i>金币</i></div>
       <div class="sellActions">
         <button class="btn ghost" id="sellCancel" type="button">再养养</button>

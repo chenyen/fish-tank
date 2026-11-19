@@ -580,7 +580,7 @@ def rename_fish(body: FishRename, request: Request):
 
 @app.post("/api/fish/sell")
 def sell_fish(body: FishSell, request: Request):
-    """卖出成鱼（成长到「成鱼」阶段及以上）。校验后删除鱼并把卖价入账。"""
+    """卖出满级鱼（成长到顶级「锦鲤」，所有鱼种通用）。校验后删除鱼并把卖价入账。"""
     with _lock, db.session() as conn:
         user = current_user(request, conn)
         cfg = config.load(conn)
@@ -588,9 +588,10 @@ def sell_fish(body: FishSell, request: Request):
         target = next((f for f in fish_list if f["id"] == body.fish_id), None)
         if not target:
             raise HTTPException(404, "这条鱼不在你的鱼缸里")
-        if not game.is_adult(target):
+        if not game.is_max_level(target):
             st = game.stage_of(target["growth"])
-            raise HTTPException(400, f"还没长成成鱼，当前是「{st['name']}」，养到「成鱼」才能卖")
+            top = game.STAGES[-1]["name"]
+            raise HTTPException(400, f"还没满级，当前是「{st['name']}」，养到顶级「{top}」才能卖")
         sell = game.sell_value(target, cfg)
         price = float(sell["price"])
         # 删除鱼 + 金币入账（原子）

@@ -819,24 +819,6 @@ canvas { display: block; width: 100%; height: 100%; cursor: default; touch-actio
 
 .fishitem .topRight { display: flex; align-items: center; gap: 6px; }
 
-/* 成长状态标签：饱满=青绿，正常=中性，缓慢=琥珀，停滞=冷蓝，停止=警示红 */
-.gstate {
-  font-size: 10.5px;
-  line-height: 1.5;
-  padding: 1px 7px;
-  border-radius: var(--radius-pill);
-  font-weight: 600;
-  letter-spacing: .2px;
-  white-space: nowrap;
-  border: 1px solid transparent;
-}
-
-.gstate.full { color: #2bbf9f; background: rgba(75, 224, 200, .18); border-color: rgba(75, 224, 200, .5); }
-.gstate.normal { color: #5f9bb5; background: rgba(166, 216, 234, .16); border-color: rgba(120, 170, 195, .3); }
-.gstate.low { color: #c98a00; background: rgba(255, 204, 77, .2); border-color: rgba(255, 180, 40, .45); }
-.gstate.stall { color: #4a86d8; background: rgba(127, 180, 255, .18); border-color: rgba(127, 180, 255, .45); }
-.gstate.stop { color: #e05454; background: rgba(255, 128, 128, .18); border-color: rgba(255, 128, 128, .5); }
-
 .bar {
   height: 5px;
   border-radius: var(--radius-pill);
@@ -853,9 +835,6 @@ canvas { display: block; width: 100%; height: 100%; cursor: default; touch-actio
 }
 
 .bar.grow > i { background: linear-gradient(90deg, #4be0c8, #7ee8ff); }
-.bar.grow.low > i { background: linear-gradient(90deg, #ffcc4d, #ff9d5c); }
-.bar.grow.stall > i { background: linear-gradient(90deg, #7fb4ff, #a9c8ff); }
-.bar.grow.stop > i { background: linear-gradient(90deg, #ff8080, #ffa8a8); }
 .bar.hunger > i { background: linear-gradient(90deg, #ffcc4d, #ff9d5c); }
 
 .meta {

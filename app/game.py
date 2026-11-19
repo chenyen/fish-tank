@@ -294,11 +294,11 @@ def is_max_level(fish: dict) -> bool:
 
 
 def sell_value(fish: dict, cfg: dict | None = None) -> dict:
-    """成鱼卖出价 = 鱼种买价 × 卖价倍率 + 养成饲料钱。
+    """满级鱼卖出价 = 鱼种买价 × 卖价倍率 + 养成饲料钱。
 
+    所有鱼种统一：长到最高阶段（顶级「锦鲤」，growth ≥ 1200）才能卖出。
     饲料钱按「累计投喂份数 × 每份饲料单价」折算；每份单价 = 每包价格 / 每包份数。
-    所有鱼种长到「成鱼」阶段即可卖出，返回明细方便前端展示构成。
-    未到成鱼的鱼仍给出估价（sellable=False）。
+    返回明细，方便前端展示构成。未满级的鱼仍给出估价（sellable=False）。
     """
     sp = fish.get("species")
     buy_price = float(species_price(sp, cfg))
@@ -310,7 +310,7 @@ def sell_value(fish: dict, cfg: dict | None = None) -> dict:
     from_buy = round(buy_price * mult, 2)
     from_food = round(fed * unit_food, 2)
     return {
-        "sellable": is_adult(fish),
+        "sellable": is_max_level(fish),
         "buy_price": round(buy_price, 2),
         "mult": mult,
         "fed": fed,
