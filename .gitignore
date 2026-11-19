@@ -23,3 +23,8 @@ logs/
 # 项目数据与临时备份
 .workbuddy/
 *.bak*
+
+# 一次性素材处理脚本与图生图原始输出
+_koi_process.py
+_batch_process.py
+generated-images/

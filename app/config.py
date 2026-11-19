@@ -60,6 +60,10 @@ GLOBAL_FIELDS = [
     {"key": "initial_coins", "label": "初始金币", "type": "float", "min": 0,
      "max": 100000, "step": 1, "unit": "金币", "default": 30.0,
      "hint": "新玩家注册时发放的金币", "group": "产币与经济"},
+    {"key": "sell_mult", "label": "成鱼卖价倍率", "type": "float", "min": 0,
+     "max": 100, "step": 0.5, "unit": "倍", "default": 3.0, "decimals": 1,
+     "hint": "成鱼（成长到「成鱼」阶段及以上）卖出价 = 鱼种买价 × 本倍率 + 养成期间投喂的饲料钱。倍率越大卖得越多",
+     "group": "产币与经济"},
     {"key": "food_pack_size", "label": "每包饲料份数", "type": "int", "min": 1,
      "max": 999, "step": 1, "unit": "份", "default": 5,
      "hint": "购买一次得到多少份饲料", "group": "饲料"},
@@ -79,6 +83,10 @@ GLOBAL_FIELDS = [
     {"key": "tank_capacity", "label": "鱼缸容量上限", "type": "int", "min": 0,
      "max": 999, "step": 1, "unit": "条", "default": 0,
      "hint": "0 = 不限（默认，缸内养鱼数量取消上限）；填大于 0 才按上限限制购鱼",
+     "group": "鱼缸"},
+    {"key": "swim_speed", "label": "游动速度倍率", "type": "float", "min": 0.2,
+     "max": 2, "step": 0.05, "unit": "倍", "default": 0.65, "decimals": 2,
+     "hint": "鱼在水里游动的快慢倍率；1 = 原速，0.65 = 慢一点（默认），数值越小游得越慢。同时影响摆尾频率",
      "group": "鱼缸"},
     {"key": "growth_per_sec", "label": "每秒基础成长", "type": "float", "min": 0,
      "max": 5, "step": 0.001, "unit": "点/秒", "default": 0.0133, "decimals": 4,
@@ -130,10 +138,8 @@ DEFAULT_SPECIES = [
      "look": "clown", "desc": "橙白条纹的小家伙，爱在中层来回穿梭，灵活又耐看", "sort": 1, "enabled": 1},
     {"key": "shark", "name": "鲨鱼", "price": 60.0, "size": 1.9, "coin": 1.8,
      "look": "shark", "desc": "缸里体型最大的家伙，巡游范围广、产币最多，价格也最贵", "sort": 2, "enabled": 1},
-    {"key": "shrimp", "name": "小虾", "price": 12.0, "size": 0.55, "coin": 0.5,
-     "look": "shrimp", "desc": "只贴着缸底短距离挪动，大部分时间趴着不动", "sort": 3, "enabled": 1},
     {"key": "clam", "name": "砗磲", "price": 35.0, "size": 1.0, "coin": 0.8,
-     "look": "clam", "desc": "基本不移动，安静地一张一合扇动贝壳", "sort": 4, "enabled": 1},
+     "look": "clam", "desc": "基本不移动，安静地一张一合扇动贝壳", "sort": 3, "enabled": 1},
 ]
 
 # ---------------------------------------------------------------- 外观造型库
@@ -141,29 +147,27 @@ DEFAULT_SPECIES = [
 # 鱼种「外观」可选项：同一套 key 前后台共用，后台选择后前台按此造型绘制。
 # hue 是外观库的预览底色，缸内每条鱼的 hue 仍由个体随机值决定。
 FISH_LOOKS = [
-    {"key": "carp", "label": "鲤鱼", "icon": "🐟", "hue": 28,
+    {"key": "carp", "label": "鲤鱼", "icon": "🐟", "hue": 28, "cat": "淡水鱼",
      "desc": "圆润身体 + 扇尾，最通用的小鱼"},
-    {"key": "clown", "label": "小丑鱼", "icon": "🐠", "hue": 22,
+    {"key": "clown", "label": "小丑鱼", "icon": "🐠", "hue": 22, "cat": "海水鱼",
      "desc": "橙底白纹，中层穿梭很灵动"},
-    {"key": "shark", "label": "鲨鱼", "icon": "🦈", "hue": 205,
+    {"key": "shark", "label": "鲨鱼", "icon": "🦈", "hue": 205, "cat": "海水鱼",
      "desc": "尖吻大背鳍，巡游范围广"},
-    {"key": "shrimp", "label": "小虾", "icon": "🦐", "hue": 12,
-     "desc": "分节身体和长触须，贴底爬行"},
-    {"key": "clam", "label": "砗磲", "icon": "🐚", "hue": 186,
+    {"key": "clam", "label": "砗磲", "icon": "🐚", "hue": 186, "cat": "特色生物",
      "desc": "落底不动，两片壳慢慢开合"},
-    {"key": "goldfish", "label": "金鱼", "icon": "🐡", "hue": 35,
+    {"key": "goldfish", "label": "金鱼", "icon": "🐡", "hue": 35, "cat": "淡水鱼",
      "desc": "鼓眼睛 + 双纱尾，慢悠悠地摆动"},
-    {"key": "koi", "label": "锦鲤", "icon": "🐟", "hue": 8,
+    {"key": "koi", "label": "锦鲤", "icon": "🐟", "hue": 8, "cat": "淡水鱼",
      "desc": "白底红斑的宽尾锦鲤，气定神闲"},
-    {"key": "guppy", "label": "孔雀鱼", "icon": "🐠", "hue": 168,
+    {"key": "guppy", "label": "孔雀鱼", "icon": "🐠", "hue": 168, "cat": "淡水鱼",
      "desc": "小巧身体拖着彩色大尾巴"},
-    {"key": "angelfish", "label": "神仙鱼", "icon": "🐟", "hue": 46,
+    {"key": "angelfish", "label": "神仙鱼", "icon": "🐟", "hue": 46, "cat": "淡水鱼",
      "desc": "三角侧扁身体，长鳍优雅漂游"},
-    {"key": "tetra", "label": "灯鱼", "icon": "🐟", "hue": 190,
+    {"key": "tetra", "label": "灯鱼", "icon": "🐟", "hue": 190, "cat": "淡水鱼",
      "desc": "细长身形，侧边一条霓虹灯带"},
-    {"key": "puffer", "label": "河豚", "icon": "🐡", "hue": 46,
+    {"key": "puffer", "label": "河豚", "icon": "🐡", "hue": 46, "cat": "海水鱼",
      "desc": "圆鼓鼓的身体，小鳍快速扑腾"},
-    {"key": "seahorse", "label": "海马", "icon": "🐴", "hue": 150,
+    {"key": "seahorse", "label": "海马", "icon": "🐴", "hue": 150, "cat": "特色生物",
      "desc": "卷曲尾巴，悬停在水中微微起伏"},
 ]
 LOOK_KEYS = {look["key"] for look in FISH_LOOKS}
@@ -382,7 +386,11 @@ def clean_species_list(raw) -> list:
 
 
 def save_species(conn, raw) -> list:
-    """整表保存：新增/修改直接覆盖，缺席的鱼种按「是否还被鱼使用」下架或删除。"""
+    """整表保存：新增/修改直接覆盖；表中消失的鱼种一律下架，不物理删除。
+
+    鱼种一经添加便不允许删除，只能在后台取消「上架」来下架，
+    这样历史鱼（按 species key 关联外观与数值）永远不会因误删失联。
+    """
     items = clean_species_list(raw)
     warnings = []
     for sp in items:
@@ -391,18 +399,10 @@ def save_species(conn, raw) -> list:
     for row in conn.execute("SELECT key, name FROM species").fetchall():
         if row["key"] in keep:
             continue
-        used = conn.execute(
-            "SELECT COUNT(*) AS c FROM fish WHERE species=?", (row["key"],)
-        ).fetchone()["c"]
-        if used:
-            conn.execute("UPDATE species SET enabled=0 WHERE key=?", (row["key"],))
-            warnings.append(
-                f"「{row['name']}」还有 {used} 条鱼在用，已改为下架：不再出现在购买列表，"
-                f"已有的鱼外观与数值保持不变"
-            )
-        else:
-            conn.execute("DELETE FROM species WHERE key=?", (row["key"],))
-            warnings.append(f"「{row['name']}」没有鱼在用，已从鱼种表删除")
+        conn.execute("UPDATE species SET enabled=0 WHERE key=?", (row["key"],))
+        warnings.append(
+            f"「{row['name']}」已从表中移除，按规则不删除、已自动下架（已有的鱼不受影响）"
+        )
     conn.commit()
     return warnings
 

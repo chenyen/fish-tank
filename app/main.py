@@ -133,8 +133,8 @@ def save_world(conn, tank: dict, fish_list: list) -> None:
     )
     for f in fish_list:
         conn.execute(
-            "UPDATE fish SET growth=?, hunger=? WHERE id=?",
-            (f["growth"], f["hunger"], f["id"]),
+            "UPDATE fish SET growth=?, hunger=?, fed=? WHERE id=?",
+            (f["growth"], f["hunger"], int(f.get("fed") or 0), f["id"]),
         )
     conn.commit()
 
@@ -190,6 +190,7 @@ def serialize(tank: dict, fish_list: list, gain: dict, title: str, cfg: dict) ->
             "age": int(now - f["born"]),
             "stage": st,
             "adult": game.is_adult(f),
+            "sell": game.sell_value(f, cfg),
             "eff": eff,
             "coin_rate": round(game.coin_rate(f["growth"], f["hunger"], sp, cfg), 2),
             "base_rate": game.COIN_RATES[st["key"]],
@@ -239,6 +240,7 @@ def serialize(tank: dict, fish_list: list, gain: dict, title: str, cfg: dict) ->
             "advance_reward": game.ADVANCE_REWARD,
             "growth_per_sec": gprof["per_sec"],
             "growth_tiers": gprof["tiers"],
+            "swim_speed": float(params.get("swim_speed", 1) or 1),
         },
     }
 
@@ -276,6 +278,10 @@ class TitleReq(BaseModel):
 class FishRename(BaseModel):
     fish_id: int
     name: str = ""
+
+
+class FishSell(BaseModel):
+    fish_id: int
 
 
 class AdminConfigReq(BaseModel):
@@ -572,6 +578,40 @@ def rename_fish(body: FishRename, request: Request):
         return serialize(tank, fish_list, gain, tank_title(conn, tank["id"]), cfg)
 
 
+@app.post("/api/fish/sell")
+def sell_fish(body: FishSell, request: Request):
+    """卖出成鱼（成长到「成鱼」阶段及以上）。校验后删除鱼并把卖价入账。"""
+    with _lock, db.session() as conn:
+        user = current_user(request, conn)
+        cfg = config.load(conn)
+        tank, fish_list, gain = advance(conn, user["id"], cfg)
+        target = next((f for f in fish_list if f["id"] == body.fish_id), None)
+        if not target:
+            raise HTTPException(404, "这条鱼不在你的鱼缸里")
+        if not game.is_adult(target):
+            st = game.stage_of(target["growth"])
+            raise HTTPException(400, f"还没长成成鱼，当前是「{st['name']}」，养到「成鱼」才能卖")
+        sell = game.sell_value(target, cfg)
+        price = float(sell["price"])
+        # 删除鱼 + 金币入账（原子）
+        conn.execute("DELETE FROM fish WHERE id=? AND tank_id=?", (body.fish_id, tank["id"]))
+        tank["coins"] = round(float(tank["coins"]) + price, 2)
+        save_world(conn, tank, [f for f in fish_list if f["id"] != body.fish_id])
+        fish_list = get_fish(conn, tank["id"])
+        data = serialize(tank, fish_list, gain, tank_title(conn, tank["id"]), cfg)
+    data["sold"] = {
+        "id": body.fish_id,
+        "name": target["name"],
+        "buy_price": sell["buy_price"],
+        "price": price,
+        "from_buy": sell["from_buy"],
+        "from_food": sell["from_food"],
+        "mult": sell["mult"],
+        "fed": sell["fed"],
+    }
+    return data
+
+
 @app.post("/api/feed")
 def feed(body: FeedReq, request: Request):
     with _lock, db.session() as conn:
@@ -587,6 +627,7 @@ def feed(body: FeedReq, request: Request):
             raise HTTPException(400, f"{target['name']} 已经吃饱了")
         tank["food"] -= 1
         target["hunger"] = min(100.0, target["hunger"] + float(game.param(cfg, "feed_amount")))
+        target["fed"] = int(target.get("fed") or 0) + 1   # 累计投喂份数，供卖价折算饲料钱
         save_world(conn, tank, fish_list)
         return serialize(tank, fish_list, gain, tank_title(conn, tank["id"]), cfg)
 
@@ -632,6 +673,7 @@ def feed_all(request: Request):
             while given < need and int(tank["food"]) > 0:
                 tank["food"] = int(tank["food"]) - 1
                 f["hunger"] = min(100.0, float(f["hunger"]) + per)
+                f["fed"] = int(f.get("fed") or 0) + 1     # 累计投喂份数，供卖价折算饲料钱
                 packs += 1
                 given += 1
             if given:

@@ -1274,3 +1274,66 @@ input.renaming {
 .boardTable td.stage { color: var(--accent); }
 .boardTable td.num { text-align: right; color: var(--gold); font-variant-numeric: tabular-nums; }
 .boardTable .blank { color: var(--muted); text-align: center; padding: 12px 0; }
+
+/* -------------------------------------------------- 成鱼卖出 */
+.fishitem.is-max {
+  border-color: rgba(255, 204, 77, .35);
+  background: linear-gradient(180deg, rgba(255, 204, 77, .06), var(--row-bg));
+}
+.sellBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 7px;
+  border-top: 1px dashed var(--line);
+}
+.sellVal { font-size: 11px; color: var(--muted); }
+.sellVal b { color: var(--gold); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.sellBtn {
+  flex: 0 0 auto;
+  padding: 3px 12px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #3a2600;
+  background: linear-gradient(135deg, var(--gold), var(--gold-2));
+  border: none;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: transform .15s, filter .15s;
+}
+.sellBtn:hover { filter: brightness(1.08); transform: translateY(-1px); }
+.sellBtn:active { transform: scale(.95); }
+
+/* 卖出确认弹窗 */
+.sellcard { width: min(400px, 100%); }
+.sellcard .sub { color: var(--muted); font-size: 12.5px; line-height: 1.6; margin: 6px 0 14px; }
+.sellDetail {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+.sellDetail > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 9px 13px;
+  font-size: 12.5px;
+  color: var(--muted);
+  border-bottom: 1px solid var(--line-soft);
+}
+.sellDetail > div:last-child { border-bottom: none; }
+.sellDetail b { color: var(--text); font-variant-numeric: tabular-nums; }
+.sellDetail .sellTotal { background: rgba(255, 204, 77, .09); font-size: 14px; color: var(--text); }
+.sellDetail .sellTotal b { color: var(--gold); font-size: 18px; font-weight: 800; }
+.sellActions { display: flex; gap: 10px; }
+.sellActions .btn { flex: 1; }
+.sellConfirm {
+  color: #3a2600;
+  background: linear-gradient(135deg, var(--gold), var(--gold-2));
+  border: none;
+}
+.sellConfirm:hover:not(:disabled) { filter: brightness(1.08); }
+.sellConfirm:disabled { opacity: .6; cursor: wait; }

@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS fish (
     hunger  REAL NOT NULL DEFAULT 60,
     hue     INTEGER NOT NULL DEFAULT 200,
     species TEXT NOT NULL DEFAULT 'carp',
+    fed     INTEGER NOT NULL DEFAULT 0,
     born    REAL NOT NULL,
     FOREIGN KEY (tank_id) REFERENCES tanks(id)
 );
@@ -78,6 +79,9 @@ def _migrate(conn) -> None:
     fcols = {r["name"] for r in conn.execute("PRAGMA table_info(fish)")}
     if "species" not in fcols:
         conn.execute("ALTER TABLE fish ADD COLUMN species TEXT NOT NULL DEFAULT 'carp'")
+    # 兼容旧库：累计投喂份数（卖鱼时按此折算饲料钱），老鱼从 0 开始记
+    if "fed" not in fcols:
+        conn.execute("ALTER TABLE fish ADD COLUMN fed INTEGER NOT NULL DEFAULT 0")
     conn.commit()
 
 

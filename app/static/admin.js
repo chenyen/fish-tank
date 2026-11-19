@@ -8,7 +8,6 @@
   ));
 
   let cfg = null;
-  let activeLook = 'carp';      // 外观库中当前选中的造型，作为新增鱼种的默认外观
   let toastTimer = null;
 
   const TOAST_MIN_MS = 1800;
@@ -180,14 +179,42 @@
   }
 
   function lookOptionsHtml(selected) {
-    const cur = FishArt.normalize(selected);
-    return allLooks().map((l) => {
+    const raw = String(selected == null ? '' : selected).trim();
+    const cur = raw ? FishArt.normalize(raw) : '';   // 空值（新增行）不预选任何造型
+    const opts = allLooks().map((l) => {
       const key = FishArt.normalize(l.key);
-      return `<option value="${esc(key)}"${key === cur ? ' selected' : ''}>${esc(l.icon || FishArt.iconOf(key))} ${esc(l.label || FishArt.labelOf(key))}</option>`;
+      return `<option value="${esc(key)}"${key === cur ? ' selected' : ''}>${esc(l.label || FishArt.labelOf(key))}</option>`;
     }).join('');
+    // 占位项：有选中造型时仍排在最前（便于改回），但不会重复出现两个选中项
+    return `<option value=""${cur ? '' : ' selected'}>请选择外观</option>` + opts;
   }
 
-  function drawLookPreview(canvas, look, hue) {
+  // 选了外观后，名称 / 描述跟着该造型同步；已手动改过的字段不再覆盖
+  function applyLookMeta(tr, lookKey) {
+    if (!tr) return;
+    if (tr.dataset.new !== '1') return;   // 只同步新增行，已有鱼种的名称描述保持原样
+    const item = lookKey ? lookItem(lookKey) : null;
+    const nameInp = tr.querySelector('[data-f="name"]');
+    const descInp = tr.querySelector('[data-f="desc"]');
+    if (nameInp && tr.dataset.nameDirty !== '1') {
+      const prev = tr.dataset.autoName || '';
+      const cur = nameInp.value.trim();
+      if (!cur || cur === prev) {
+        nameInp.value = item ? (item.label || FishArt.labelOf(lookKey)) : '';
+        tr.dataset.autoName = nameInp.value;
+      }
+    }
+    if (descInp && tr.dataset.descDirty !== '1') {
+      const prev = tr.dataset.autoDesc || '';
+      const cur = descInp.value.trim();
+      if (!cur || cur === prev) {
+        descInp.value = item ? (item.desc || '') : '';
+        tr.dataset.autoDesc = descInp.value;
+      }
+    }
+  }
+
+  function drawLookPreview(canvas, look, hue, ready) {
     if (!canvas) return;
     const item = lookItem(look);
     const cssW = canvas.clientWidth || Number(canvas.getAttribute('width')) || 104;
@@ -205,7 +232,7 @@
     c.fillRect(0, 0, cssW, cssH);
     const key = FishArt.normalize(item.key);
     const tall = key === 'angelfish' || key === 'seahorse';
-    const r = Math.min(cssW / (key === 'shrimp' ? 3.8 : 3.1), cssH / (tall ? 2.9 : 2.5));
+    const r = Math.min(cssW / 3.1, cssH / (tall ? 2.9 : 2.5));
     c.save();
     c.translate(cssW / 2, cssH / 2 + (tall ? 3 : 1));
     if (key !== 'clam') c.scale(-1, 1);   // 造型朝左，和鱼缸里的默认朝向一致
@@ -215,36 +242,66 @@
       wag: 0.16, gape: 0.46, phase: 0.7,
     });
     c.restore();
+    // 图片造型首帧会回退手绘；素材就绪后自动重画为真实图片（ready 标记避免重复登记）
+    if (!ready && FishArt.needsImage && FishArt.needsImage(key) && FishArt.whenReady) {
+      FishArt.whenReady(key, () => {
+        if (canvas.isConnected) drawLookPreview(canvas, look, hue, true);
+      });
+    }
   }
 
-  function updateLookPickTip() {
-    const tip = $('#lookPickTip');
-    if (!tip) return;
-    const item = lookItem(activeLook);
-    tip.textContent = `新增默认：${item.icon || FishArt.iconOf(item.key)} ${item.label || FishArt.labelOf(item.key)}`;
+  let currentCat = '全部';   // 当前外观分类；'全部' 表示不过滤
+  try { currentCat = sessionStorage.getItem('adLookCat') || '全部'; } catch (e) { /* 忽略隐私模式 */ }
+  const CAT_ORDER = ['淡水鱼', '海水鱼', '特色生物'];
+
+  function renderLookCatTabs() {
+    const box = $('#lookCatTabs');
+    if (!box) return;
+    const looks = allLooks();
+    // 按预置顺序归类外观，未标注 cat 的归入「其他」，保证不丢项
+    const groups = new Map();
+    looks.forEach((l) => {
+      const c = (l.cat && String(l.cat).trim()) || '其他';
+      if (!groups.has(c)) groups.set(c, []);
+      groups.get(c).push(l);
+    });
+    const cats = ['全部', ...CAT_ORDER.filter((c) => groups.has(c)),
+      ...Array.from(groups.keys()).filter((c) => c !== '全部' && !CAT_ORDER.includes(c))];
+    // 记住的分类若已不存在（如配置变更），回落到「全部」
+    if (!cats.includes(currentCat)) currentCat = '全部';
+
+    box.innerHTML = cats.map((c) => {
+      const n = c === '全部' ? looks.length : groups.get(c).length;
+      return `<button class="lookCatTab${c === currentCat ? ' is-active' : ''}" type="button"
+        role="tab" aria-selected="${c === currentCat ? 'true' : 'false'}" data-cat="${esc(c)}">${esc(c)}<span class="catNum">${n}</span></button>`;
+    }).join('');
+
+    box.querySelectorAll('.lookCatTab').forEach((b) => {
+      b.onclick = () => {
+        currentCat = b.dataset.cat;
+        try { sessionStorage.setItem('adLookCat', currentCat); } catch (e) { /* 忽略隐私模式 */ }
+        renderLookCatTabs();
+        renderLookGallery();
+      };
+    });
   }
 
   function renderLookGallery() {
     const box = $('#lookGallery');
     if (!box) return;
-    box.innerHTML = allLooks().map((l) => {
+    const looks = currentCat === '全部'
+      ? allLooks()
+      : allLooks().filter((l) => (((l.cat && String(l.cat).trim()) || '其他') === currentCat));
+    box.innerHTML = looks.map((l) => {
       const key = FishArt.normalize(l.key);
-      return `<button class="lookCard${key === activeLook ? ' on' : ''}" type="button" data-look="${esc(key)}" title="${esc(l.desc || '')}">
+      return `<div class="lookCard" data-look="${esc(key)}">
         <canvas class="lookCanvas" width="104" height="62"></canvas>
-        <span class="lookMeta"><b>${esc(l.icon || FishArt.iconOf(key))} ${esc(l.label || FishArt.labelOf(key))}</b><i>${esc(l.desc || '')}</i></span>
-      </button>`;
+        <span class="lookMeta"><b>${esc(l.label || FishArt.labelOf(key))}</b><i>${esc(l.desc || '')}</i></span>
+      </div>`;
     }).join('');
     box.querySelectorAll('.lookCanvas').forEach((canvas) => {
       drawLookPreview(canvas, canvas.closest('.lookCard').dataset.look);
     });
-    box.querySelectorAll('.lookCard').forEach((card) => {
-      card.onclick = () => {
-        activeLook = FishArt.normalize(card.dataset.look);
-        box.querySelectorAll('.lookCard').forEach((x) => x.classList.toggle('on', x === card));
-        updateLookPickTip();
-      };
-    });
-    updateLookPickTip();
   }
 
   function drawRowPreview(tr) {
@@ -252,17 +309,43 @@
     const sel = tr.querySelector('[data-f="look"]');
     const canvas = tr.querySelector('[data-look-preview]');
     if (!sel || !canvas) return;
+    if (!sel.value) { drawLookPlaceholder(canvas); return; }
     drawLookPreview(canvas, sel.value);
+  }
+
+  function drawLookPlaceholder(canvas) {
+    if (!canvas) return;
+    const cssW = canvas.clientWidth || Number(canvas.getAttribute('width')) || 96;
+    const cssH = canvas.clientHeight || Number(canvas.getAttribute('height')) || 52;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.round(cssW * dpr);
+    canvas.height = Math.round(cssH * dpr);
+    const c = canvas.getContext('2d');
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    c.clearRect(0, 0, cssW, cssH);
+    const bg = c.createLinearGradient(0, 0, 0, cssH);
+    bg.addColorStop(0, '#123c52');
+    bg.addColorStop(1, '#061f2b');
+    c.fillStyle = bg;
+    c.fillRect(0, 0, cssW, cssH);
+    c.fillStyle = 'rgba(190, 225, 240, .45)';
+    c.font = '11px system-ui, sans-serif';
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.fillText('待选外观', cssW / 2, cssH / 2);
   }
 
   function rowHtml(sp) {
     const locked = (sp.used || 0) > 0;   // 已有鱼在用的鱼种，标识不允许改，避免老数据失联
-    return `<tr data-key="${esc(sp.key)}" data-used="${sp.used || 0}">
+    const isNew = !!sp._new;             // 新增但尚未保存的行：允许「移除」撤销
+    return `<tr data-key="${esc(sp.key)}" data-used="${sp.used || 0}"${isNew ? ' data-new="1"' : ''}>
       <td class="colKey">
         <input type="text" data-f="key" value="${esc(sp.key)}" ${locked ? 'disabled' : ''} />
+      </td>
+      <td class="colName">
+        <input type="text" data-f="name" value="${esc(sp.name)}" maxlength="20" />
         ${locked ? `<span class="usedTag">${sp.used} 条鱼在用</span>` : ''}
       </td>
-      <td class="colName"><input type="text" data-f="name" value="${esc(sp.name)}" maxlength="20" /></td>
       <td class="colLook">
         <span class="lookCell">
           <canvas class="lookThumb" width="96" height="52" data-look-preview></canvas>
@@ -274,7 +357,9 @@
       <td class="colNum"><input type="number" data-f="coin" value="${sp.coin}" min="0" max="100" step="0.05" /></td>
       <td class="colDesc"><textarea class="spDescBox" data-f="desc" maxlength="200">${esc(sp.desc)}</textarea></td>
       <td class="colOn"><input type="checkbox" data-f="enabled" ${sp.enabled ? 'checked' : ''} /></td>
-      <td class="colDel"><button class="spDel" type="button">删除</button></td>
+      <td class="colDel">${isNew
+        ? '<button class="spDel" type="button" title="撤销这条未保存的新增">移除</button>'
+        : '<span class="spNoDel" title="已添加的鱼种不能删除，请取消「上架」来下架">已入库</span>'}</td>
     </tr>`;
   }
 
@@ -282,7 +367,18 @@
     const tbody = $('#spTable').querySelector('tbody');
     tbody.querySelectorAll('tr').forEach(drawRowPreview);
     tbody.querySelectorAll('[data-f="look"]').forEach((sel) => {
-      sel.onchange = () => drawRowPreview(sel.closest('tr'));
+      sel.onchange = () => {
+        const tr = sel.closest('tr');
+        applyLookMeta(tr, sel.value);     // 名称 / 描述随外观同步
+        drawRowPreview(tr);
+      };
+    });
+    // 手动改过名称或描述后，不再被外观同步覆盖
+    tbody.querySelectorAll('[data-f="name"]').forEach((inp) => {
+      inp.oninput = () => { inp.closest('tr').dataset.nameDirty = '1'; };
+    });
+    tbody.querySelectorAll('[data-f="desc"]').forEach((inp) => {
+      inp.oninput = () => { inp.closest('tr').dataset.descDirty = '1'; };
     });
     tbody.querySelectorAll('.spDel').forEach((btn) => {
       btn.onclick = () => {
@@ -295,6 +391,7 @@
   }
 
   function renderSpecies() {
+    renderLookCatTabs();
     renderLookGallery();
     $('#spTable').querySelector('tbody').innerHTML = cfg.species.map(rowHtml).join('');
     bindRows();
@@ -304,7 +401,7 @@
     const tbody = $('#spTable').querySelector('tbody');
     const blank = {
       key: '', name: '', price: 20, size: 1, coin: 1, desc: '',
-      enabled: 1, used: 0, look: activeLook,
+      enabled: 1, used: 0, look: '', _new: true,
     };
     tbody.insertAdjacentHTML('beforeend', rowHtml(blank));
     bindRows();
@@ -325,7 +422,7 @@
   }
 
   function collectSpecies() {
-    return Array.prototype.map.call(
+    const rows = Array.prototype.map.call(
       document.querySelectorAll('#spTable tbody tr'),
       (tr) => {
         const get = (f) => tr.querySelector(`[data-f="${f}"]`);
@@ -336,11 +433,23 @@
           size: Number(get('size').value),
           coin: Number(get('coin').value),
           desc: get('desc').value.trim(),
-          look: get('look') ? FishArt.normalize(get('look').value) : 'carp',
+          look: get('look') ? get('look').value.trim() : '',
           enabled: get('enabled').checked ? 1 : 0,
         };
       }
     );
+    // 「标识」列已隐藏：新增行的标识由所选外观自动生成，并保证不与已有标识重复
+    const used = new Set(rows.map((r) => r.key).filter(Boolean));
+    rows.forEach((r) => {
+      if (r.key) return;
+      const base = (r.look || 'fish').replace(/[^a-z0-9_]/g, '').slice(0, 20) || 'fish';
+      let k = base, i = 2;
+      while (used.has(k)) { k = base + i; i += 1; }
+      used.add(k);
+      r.key = k;
+      r.autoKey = true;      // 保存后回传，方便提示用户新增鱼种的标识
+    });
+    return rows;
   }
 
   function showWarnings(list) {
@@ -352,6 +461,12 @@
   async function saveAll() {
     const params = collectParams();
     const species = collectSpecies();
+    // 新增鱼种必须先选定外观造型，避免保存出一个外观不明的鱼种
+    const noLook = species.find((sp) => !sp.look);
+    if (noLook) {
+      toast(`请先为「${noLook.name || '新增鱼种'}」选择外观造型`, { ms: 3500, type: 'error' });
+      return;
+    }
     const btns = [$('#btnSave'), $('#btnSave2')];
     btns.forEach((b) => { if (b) b.disabled = true; });
     showWarnings([]);
@@ -359,10 +474,11 @@
       const data = await api('/api/admin/config', 'POST', { params, species });
       applyConfig(data);
       showWarnings(data.warnings);
+      const newKeys = species.filter((s) => s.autoKey).map((s) => `${s.name || s.key}(${s.key})`);
       $('#saveHint2').textContent = '已保存 ' + new Date().toLocaleTimeString();
       toast(data.warnings && data.warnings.length
         ? '已保存，前台立即生效（' + data.warnings.length + ' 条提示）'
-        : '已保存，前台立即生效');
+        : '已保存，前台立即生效' + (newKeys.length ? '，新增标识 ' + newKeys.join('、') : ''));
     } catch (e) {
       if (e.status === 401) { showLogin(); toast('登录状态已过期，请重新登录', { ms: 3000, type: 'error' }); return; }
       toast(e.message, { ms: 4000, type: 'error' });
@@ -412,6 +528,71 @@
       hint.textContent = e.message;
     }
   };
+
+  /* ------------------------------------------------------------ 外观预览折叠 */
+
+  function initFoldLooks() {
+    const box = $('#lookLibrary');
+    const btn = $('#btnFoldLooks');
+    if (!box || !btn) return;
+
+    function setFolded(folded, remember) {
+      box.classList.toggle('folded', folded);
+      btn.setAttribute('aria-expanded', folded ? 'false' : 'true');
+      // 展开时重绘：折叠期间 canvas 尺寸为 0，首帧是错的
+      if (!folded) {
+        box.querySelectorAll('.lookCanvas').forEach((canvas) => {
+          drawLookPreview(canvas, canvas.closest('.lookCard').dataset.look);
+        });
+      }
+      if (remember) {
+        try { sessionStorage.setItem('adLooksFolded', folded ? '1' : '0'); } catch (e) { /* 忽略隐私模式 */ }
+      }
+    }
+
+    btn.addEventListener('click', () => {
+      setFolded(!box.classList.contains('folded'), true);
+    });
+
+    let saved = '';
+    try { saved = sessionStorage.getItem('adLooksFolded') || ''; } catch (e) { /* 忽略 */ }
+    setFolded(saved === '1', false);
+  }
+
+  initFoldLooks();
+
+  /* ------------------------------------------------------------ 分类 Tabs */
+
+  function initTabs() {
+    const tabs = Array.prototype.slice.call(document.querySelectorAll('.adTab[data-tab]'));
+    const panels = Array.prototype.slice.call(document.querySelectorAll('.tabPanel[data-panel]'));
+    if (!tabs.length || !panels.length) return;
+
+    function activate(name, remember) {
+      tabs.forEach((b) => {
+        const on = b.dataset.tab === name;
+        b.classList.toggle('is-active', on);
+        b.setAttribute('aria-selected', on ? 'true' : 'false');
+      });
+      panels.forEach((p) => p.classList.toggle('hidden', p.dataset.panel !== name));
+      // 面板隐藏时 canvas 取不到真实宽度，切回可见后重绘外观预览
+      if (name === 'species') {
+        renderLookGallery();
+        document.querySelectorAll('#spTable tbody tr').forEach(drawRowPreview);
+      }
+      if (remember) {
+        try { sessionStorage.setItem('adTab', name); } catch (e) { /* 忽略隐私模式 */ }
+      }
+    }
+
+    tabs.forEach((b) => b.addEventListener('click', () => activate(b.dataset.tab, true)));
+
+    let saved = '';
+    try { saved = sessionStorage.getItem('adTab') || ''; } catch (e) { /* 忽略 */ }
+    activate(saved === 'species' ? 'species' : 'global', false);
+  }
+
+  initTabs();
 
   /* ------------------------------------------------------------ 启动 */
 

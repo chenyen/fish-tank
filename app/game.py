@@ -42,6 +42,7 @@ DEFAULT_PARAMS = {
     "feed_amount": 20.0,         # 每次投喂恢复的饱食度
     "food_regen_sec": 900,       # 饲料自然恢复间隔（秒），0 = 不自然恢复
     "initial_coins": 30.0,       # 新玩家初始金币
+    "sell_mult": 3.0,            # 成鱼卖出价倍率（× 鱼种买价）
     "initial_food": 5,           # 新玩家初始饲料
     "tank_capacity": 0,          # 鱼缸容量上限，0 = 不限
     "growth_per_sec": 0.0133,    # 「正常」档每秒成长值（约 48 点/小时）
@@ -77,16 +78,12 @@ SPECIES = {
         "key": "clown", "name": "小丑鱼", "price": 30, "size": 0.75, "coin": 1.25,
         "desc": "橙白条纹的小家伙，爱在中层来回穿梭，灵活又耐看",
     },
-    "shrimp": {
-        "key": "shrimp", "name": "小虾", "price": 12, "size": 0.55, "coin": 0.5,
-        "desc": "只贴着缸底短距离挪动，大部分时间趴着不动",
-    },
     "clam": {
         "key": "clam", "name": "砗磲", "price": 35, "size": 1.0, "coin": 0.8,
         "desc": "基本不移动，安静地一张一合扇动贝壳",
     },
 }
-SPECIES_ORDER = ["carp", "clown", "shark", "shrimp", "clam"]
+SPECIES_ORDER = ["carp", "clown", "shark", "clam"]
 DEFAULT_SPECIES = "carp"
 FISH_PRICE = SPECIES[DEFAULT_SPECIES]["price"]   # 默认鱼苗价格
 
@@ -289,6 +286,39 @@ def coin_rate(growth: float, hunger: float, species: str | None = None,
 
 def is_adult(fish: dict) -> bool:
     return fish["growth"] >= STAGES[2]["at"]
+
+
+def is_max_level(fish: dict) -> bool:
+    """满级：成长到最后一个阶段（默认「锦鲤」，at=1200）。"""
+    return fish["growth"] >= STAGES[-1]["at"]
+
+
+def sell_value(fish: dict, cfg: dict | None = None) -> dict:
+    """成鱼卖出价 = 鱼种买价 × 卖价倍率 + 养成饲料钱。
+
+    饲料钱按「累计投喂份数 × 每份饲料单价」折算；每份单价 = 每包价格 / 每包份数。
+    所有鱼种长到「成鱼」阶段即可卖出，返回明细方便前端展示构成。
+    未到成鱼的鱼仍给出估价（sellable=False）。
+    """
+    sp = fish.get("species")
+    buy_price = float(species_price(sp, cfg))
+    mult = float(param(cfg, "sell_mult")) if cfg else 3.0
+    fed = int(fish.get("fed") or 0)
+    pack_price = float(param(cfg, "food_pack_price")) if cfg else 8.0
+    pack_size = float(param(cfg, "food_pack_size")) if cfg else 5.0
+    unit_food = pack_price / pack_size if pack_size > 0 else 0.0
+    from_buy = round(buy_price * mult, 2)
+    from_food = round(fed * unit_food, 2)
+    return {
+        "sellable": is_adult(fish),
+        "buy_price": round(buy_price, 2),
+        "mult": mult,
+        "fed": fed,
+        "unit_food": round(unit_food, 4),
+        "from_buy": from_buy,
+        "from_food": from_food,
+        "price": round(from_buy + from_food, 2),
+    }
 
 
 def next_payout_at(now: float, cfg: dict | None = None) -> float:

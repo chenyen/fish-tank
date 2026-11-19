@@ -13,6 +13,11 @@
   const ctx = canvas.getContext('2d');
   let W = 0, H = 0, DPR = 1;
 
+  // 静态背景缓存：水体 / 顶部柔光 / 沙底只在尺寸或主题变化时重画，平时一次贴图
+  const bgCanvas = document.createElement('canvas');
+  const bgCtx = bgCanvas.getContext('2d');
+  let bgDirty = true;
+
   /* ------------------------------------------------------------ 界面风格
      配色全部来自 style.css 的 CSS 变量，切换主题只改 <html data-theme>，
      canvas 的水体与鱼也读同一套变量（--water-* / --fish-*），保证不撞色。 */
@@ -55,6 +60,7 @@
     pal.satK = num('--fish-sat-k', 1);
     pal.lightK = num('--fish-light-k', 1);
     pal.inkW = num('--fish-ink-w', 1);
+    bgDirty = true;   // 配色变化，静态背景需重建
   }
 
   function currentTheme() {
@@ -321,17 +327,29 @@
       const stageTxt = f.stage.next_name
         ? '距' + f.stage.next_name + ' ' + Math.max(0, Math.round(f.stage.next_at - f.growth))
         : '已满级';
-      return `<div class="fishitem" data-id="${f.id}" title="点击喂食">
+      const sell = f.sell || {};
+      const sellable = !!sell.sellable;
+      const sellBar = sellable
+        ? `<div class="sellBar"><span class="sellVal" title="买价×倍率 ${sell.from_buy} + 饲料钱 ${sell.from_food}">可卖 <b>${fmtCoins(sell.price || 0)}</b> 金币</span><button class="sellBtn" type="button" data-id="${f.id}">卖出</button></div>`
+        : '';
+      return `<div class="fishitem ${sellable ? 'is-max' : ''}" data-id="${f.id}" title="点击喂食">
         <div class="top"><b class="fname" data-id="${f.id}" title="点击给这条鱼改名">${esc(f.name)}</b><span class="topRight"><span class="gstate ${gs.key}" title="${esc(gsTip)}">${esc(gs.label)}${factorTxt}</span><span class="stag">${esc(f.species_name || '鱼苗')} · ${f.stage.name}</span></span></div>
         <div class="bar grow ${gs.key}"><i style="width:${growPct}%"></i></div>
         <div class="meta"><span>成长 ${growPct}%${rateTxt}</span><span>${stageTxt}</span></div>
         <div class="bar hunger"><i style="width:${hunger}%"></i></div>
         <div class="meta"><span>饱食 ${hunger}% · 已养 ${ageH}h</span><span>${f.coin_rate} 币/时${f.eff < 1 ? ' · 产能 ' + Math.round(f.eff * 100) + '%' : ''}</span></div>
+        ${sellBar}
       </div>`;
     }).join('');
 
     box.querySelectorAll('.fishitem').forEach((el) => {
       el.onclick = (ev) => {
+        const sellBtn = ev.target.closest('.sellBtn');
+        if (sellBtn) {
+          ev.stopPropagation();
+          askSellFish(+sellBtn.dataset.id);
+          return;
+        }
         const nameEl = ev.target.closest('.fname');
         if (nameEl) {
           ev.stopPropagation();
@@ -341,6 +359,58 @@
         feed(+el.dataset.id);
       };
     });
+  }
+
+  /* ------------------------------------------------------------ 卖出成鱼 */
+
+  function askSellFish(id) {
+    const f = state && state.fish.find((x) => x.id === id);
+    if (!f || !f.sell || !f.sell.sellable) return;
+    const s = f.sell;
+    if (document.querySelector('#sellOverlay')) return;
+    const wrap = document.createElement('div');
+    wrap.id = 'sellOverlay';
+    wrap.className = 'overlay';
+    wrap.innerHTML = `<div class="card sellcard">
+      <h1>卖出「${esc(f.name)}」</h1>
+      <p class="sub">这条鱼已长成成鱼，确定要卖掉换金币吗？卖出后无法找回。</p>
+      <div class="sellDetail">
+        <div><span>鱼种买价 × ${s.mult} 倍</span><b>${fmtCoins(s.from_buy)}</b></div>
+        <div><span>养成饲料钱（${s.fed} 份）</span><b>${fmtCoins(s.from_food)}</b></div>
+        <div class="sellTotal"><span>到手金币</span><b>${fmtCoins(s.price)}</b></div>
+      </div>
+      <div class="sellActions">
+        <button class="btn ghost" id="sellCancel" type="button">再养养</button>
+        <button class="btn sellConfirm" id="sellConfirm" type="button">确认卖出</button>
+      </div>
+    </div>`;
+    document.body.appendChild(wrap);
+    wrap.onclick = (e) => { if (e.target === wrap) closeSell(); };
+    wrap.querySelector('#sellCancel').onclick = closeSell;
+    wrap.querySelector('#sellConfirm').onclick = () => doSell(id, wrap);
+  }
+
+  function closeSell() {
+    const el = document.querySelector('#sellOverlay');
+    if (el) el.remove();
+  }
+
+  async function doSell(id, wrap) {
+    const btn = wrap.querySelector('#sellConfirm');
+    if (btn.disabled) return;
+    btn.disabled = true;
+    btn.textContent = '卖出中…';
+    try {
+      const data = await api('/api/fish/sell', 'POST', { fish_id: id });
+      closeSell();
+      applyState(data);   // 鱼已从 state 移除，sim 由 applyState 统一清理
+      const sold = data.sold || {};
+      toast(`卖出「${sold.name || '鱼'}」，到手 ${fmtCoins(sold.price || 0)} 金币`, 2600);
+    } catch (e) {
+      btn.disabled = false;
+      btn.textContent = '确认卖出';
+      toast(e.message, 2000);
+    }
   }
 
   function esc(s) {
@@ -513,6 +583,7 @@
 
   let shopEl = null;        // 当前打开的买鱼苗弹窗
   let shopCart = {};        // key -> 数量，支持一次选多种鱼
+  let shopAbort = null;     // 弹窗内监听器的 AbortController，关闭时统一解绑
 
   function fmtCoins(v) {
     const n = Number(v) || 0;
@@ -528,6 +599,7 @@
   }
 
   function closeShop() {
+    if (shopAbort) { shopAbort.abort(); shopAbort = null; }
     if (shopEl) shopEl.remove();
     shopEl = null;
   }
@@ -536,6 +608,7 @@
     if (!state) return;
     closeShop();
     shopCart = {};   // 每次打开都从空购物车开始
+    shopAbort = new AbortController();
 
     const wrap = document.createElement('div');
     wrap.id = 'shopOverlay';
@@ -589,7 +662,7 @@
       </div>`;
     }).join('');
     grid.querySelectorAll('.cardStep').forEach((btn) => {
-      bindCardStep(btn);
+      bindCardStep(btn, shopAbort ? shopAbort.signal : undefined);
     });
   }
 
@@ -612,7 +685,8 @@
   }
 
   // 点按加减一次，按住 400ms 后按 70ms 节奏连续调整
-  function bindCardStep(el) {
+  // 所有监听器带 signal：弹窗关闭时统一 abort，避免 window.pointerup 反复累积
+  function bindCardStep(el, signal) {
     let delay = null, tick = null;
     const key = el.dataset.key;
     const delta = parseInt(el.dataset.delta, 10);
@@ -621,16 +695,17 @@
       if (tick) { clearInterval(tick); tick = null; }
     };
     const fire = () => { if (!el.disabled) changeQty(key, delta); };
+    const opt = { signal };
     el.addEventListener('pointerdown', (ev) => {
       if (ev.pointerType === 'mouse' && ev.button !== 0) return;
       ev.preventDefault();
       stop();
       fire();
       delay = setTimeout(() => { delay = null; tick = setInterval(fire, 70); }, 400);
-    });
-    ['pointerup', 'pointerleave', 'pointercancel'].forEach((n) => el.addEventListener(n, stop));
-    window.addEventListener('pointerup', stop);
-    el.addEventListener('click', (ev) => { ev.preventDefault(); if (ev.detail === 0) fire(); });
+    }, opt);
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach((n) => el.addEventListener(n, stop, opt));
+    window.addEventListener('pointerup', stop, opt);
+    el.addEventListener('click', (ev) => { ev.preventDefault(); if (ev.detail === 0) fire(); }, opt);
   }
 
   // 同步底部购买栏：合计数量、合计金额、主按钮文案与提示
@@ -779,6 +854,11 @@
     canvas.width = Math.round(W * DPR);
     canvas.height = Math.round(H * DPR);
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    // 离屏背景同尺寸、同 DPR 变换
+    bgCanvas.width = canvas.width;
+    bgCanvas.height = canvas.height;
+    bgCtx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    bgDirty = true;
     if (!bubbles.length) {
       for (let i = 0; i < 26; i++) bubbles.push(newBubble(true));
     }
@@ -811,6 +891,41 @@
   let last = performance.now();
   let running = false;
 
+  /* 性能探针：URL 加 ?perf=1 开启，默认完全关闭、零开销。
+     统计 FPS / update+draw 耗时 / JS 堆内存，用于量化优化效果。 */
+  const PERF = (function () {
+    const on = new URLSearchParams(location.search).get('perf') === '1';
+    if (!on) return { on: false, begin() {}, tick() {} };
+    const el = document.createElement('div');
+    el.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:9999;pointer-events:none;'
+      + 'font:12px/1.5 ui-monospace,Consolas,monospace;color:#9fe;'
+      + 'background:rgba(2,18,26,.82);border:1px solid rgba(120,220,200,.4);'
+      + 'border-radius:8px;padding:6px 10px;white-space:pre;';
+    document.body.appendChild(el);
+    let frames = 0, acc = 0, updMs = 0, drawMs = 0, t0 = performance.now();
+    let tUpdate = 0;
+    return {
+      on: true,
+      begin() { tUpdate = performance.now(); },
+      tick(updateDone) {
+        const u = updateDone - tUpdate;
+        const total = performance.now() - updateDone;
+        updMs += u; drawMs += total;
+        frames++; acc++;
+        const now = performance.now();
+        if (now - t0 >= 500) {
+          const fps = frames * 1000 / (now - t0);
+          const mem = performance.memory
+            ? (performance.memory.usedJSHeapSize / 1048576).toFixed(1) + ' MB'
+            : 'n/a';
+          el.textContent = `FPS ${fps.toFixed(1)}  update ${(updMs / acc).toFixed(2)}ms`
+            + `  draw ${(drawMs / acc).toFixed(2)}ms  heap ${mem}`;
+          frames = 0; updMs = 0; drawMs = 0; acc = 0; t0 = now;
+        }
+      },
+    };
+  })();
+
   function loopStart() {
     if (running) return;
     running = true;
@@ -819,13 +934,22 @@
   }
 
   function frame(now) {
+    if (document.hidden) { running = false; return; }  // 页面隐藏时停止调度，避免空转耗电降频
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
+    PERF.begin();
     update(dt);
+    const updateDone = performance.now();
     draw(now / 1000);
+    PERF.tick(updateDone);
     if (state) requestAnimationFrame(frame);
     else running = false;
   }
+
+  // 切回前台时恢复动画；隐藏时 frame 内已停止调度
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && state && !running) loopStart();
+  });
 
   function fishRadius(f, sim) {
     const depth = 0.72 + 0.55 * (sim.y / Math.max(1, H));
@@ -847,7 +971,7 @@
   // 鱼种表现参数：size 体型、行为在 newSim 里按种类覆写
   const SPECIES_FX = {
     carp: { size: 0.85 }, clown: { size: 0.75 }, shark: { size: 1.9 },
-    shrimp: { size: 0.55 }, clam: { size: 1.0 }, goldfish: { size: 0.95 },
+    clam: { size: 1.0 }, goldfish: { size: 0.95 },
     koi: { size: 1.05 }, guppy: { size: 0.6 }, angelfish: { size: 1.1 },
     tetra: { size: 0.52 }, puffer: { size: 0.8 }, seahorse: { size: 0.75 },
   };
@@ -872,6 +996,8 @@
       tempo: rnd(0.6, 1.1),    // 自然游动节奏倍率：0=停顿、1=常速，平滑换挡
       tempoT: rnd(0.6, 1.1),   // 节奏目标倍率
       tempoCd: rnd(1, 4),      // 距下次换挡的倒计时（秒）
+      tailFreq: rnd(0.55, 1.75), // 固定摆尾频率个体差异：拉开各鱼摆尾周期，避免整缸同频
+      wagAmp: rnd(0.72, 1.25),   // 固定摆尾幅度个体差异：有的鱼摆得大、有的含蓄
       omega: 0,                // circle 模式的角速度（平滑过渡）
       phase: rnd(0, 6.2832),
       eat: 0,
@@ -892,7 +1018,6 @@
       cxr: rnd(0.28, 0.72),
       cyr: rnd(0.32, 0.68),
       drift: rnd(0.12, 0.5),
-      hopX: 0,                 // >0 表示只在附近挪动（小虾）
       gape: 0.18,              // 砗磲开合程度
       gapeT: rnd(0, 6),
     };
@@ -931,19 +1056,6 @@
       s.idleChance = 0.18;
       s.idleRange = [0.3, 1.2];
       s.y = H * rnd(s.bandLo, s.bandHi);
-    } else if (key === 'shrimp') {
-      // 小虾：只在缸底附近短距离挪一点，大部分时间趴着
-      s.pattern = 'crawl';
-      s.bandLo = 0.8; s.bandHi = 0.96;
-      s.speedK = rnd(0.14, 0.24);
-      s.wobble = rnd(1.6, 3.0);
-      s.amp = rnd(1.5, 4);
-      s.idleChance = 0.9;
-      s.idleRange = [2.5, 8.0];
-      s.hopX = rnd(0.03, 0.07);
-      s.y = H * rnd(0.84, 0.94);
-      s.ty = H * rnd(0.84, 0.94);
-      s.dir = 1;
     } else if (key === 'clam') {
       // 砗磲：落底不动，只开合贝壳
       s.pattern = 'sessile';
@@ -1013,11 +1125,6 @@
   function pickTarget(s) {
     const lo = Math.max(40, H * s.bandLo);
     const hi = Math.min(H - 40, Math.max(lo + 30, H * s.bandHi));
-    if (s.hopX) {                        // 小虾：目标点就在身边一小截
-      s.tx = Math.max(30, Math.min(Math.max(30, W - 30), s.x + rnd(-W * s.hopX, W * s.hopX)));
-      s.ty = rnd(lo, hi);
-      return;
-    }
     s.tx = W * rnd(0.08, 0.92);
     s.ty = rnd(lo, hi);
   }
@@ -1104,7 +1211,7 @@
     }
     s.tempo += (s.tempoT - s.tempo) * Math.min(1, dt * 0.9);   // 平滑换挡，不突变
 
-    // 打盹：到点小憩时进一步压低节奏（小虾趴得更彻底）
+    // 打盹：到点小憩时进一步压低节奏
     if (s.idle > 0) s.idle = Math.max(0, s.idle - dt);
     const idleK = s.idle > 0 ? (s.pattern === 'crawl' ? 0.12 : 0.28) : 1;
     const vTop = vCruise * s.boost * s.tempo * idleK;
@@ -1254,14 +1361,16 @@
       }
 
       const energy = f.hunger < 15 ? 0.45 : 1;
-      const speed = (26 + f.stage.scale * 22) * energy;
+      // 后台「游动速度倍率」统一缩放游速（缺省 1 兼容旧状态）
+      const speedK = (state.rules && state.rules.swim_speed) || 1;
+      const speed = (26 + f.stage.scale * 22) * energy * speedK;
       stepFish(s, dt, speed);
 
       // 边界兜底
       s.x = Math.max(30, Math.min(W - 30, s.x));
       s.y = Math.max(40, Math.min(H - 40, s.y));
       // 摆尾节奏跟随游动速度：停顿时摆尾也慢下来，快游时更欢快
-      s.phase += dt * (1.2 + speed * 0.05 * s.tempo) * (0.7 + s.speedK * 0.4) * (0.35 + 0.65 * s.tempo);
+      s.phase += dt * (1.2 + speed * 0.05 * s.tempo) * (0.7 + s.speedK * 0.4) * (0.35 + 0.65 * s.tempo) * s.tailFreq;
       if (s.eat > 0) s.eat = Math.max(0, s.eat - dt * 1.6);
     }
 
@@ -1282,47 +1391,11 @@
   }
 
   function draw(t) {
-    // 水体（颜色随界面风格变化）
-    const g = ctx.createLinearGradient(0, 0, 0, H);
-    g.addColorStop(0, pal.waterTop);
-    g.addColorStop(0.45, pal.waterMid);
-    g.addColorStop(1, pal.waterBot);
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, W, H);
+    // 静态背景一次贴图（水体 / 柔光 / 沙底）
+    if (bgDirty) buildBackground();
+    ctx.drawImage(bgCanvas, 0, 0, W, H);
 
-    if (currentTheme() === 'cartoon') {
-      // 明亮卡通：水面透下来的柔光——横向均匀、从顶部向下渐隐的蓝色亮光（不是条状光柱）
-      // 用普通半透明叠加而非 lighter：避免在本就偏亮的浅蓝底色上把通道顶到 255 变纯白
-      ctx.save();
-      const glow = ctx.createLinearGradient(0, 0, 0, H * 0.5);
-      glow.addColorStop(0, 'rgba(205, 238, 255, .6)');
-      glow.addColorStop(0.45, 'rgba(180, 230, 255, .24)');
-      glow.addColorStop(1, 'rgba(180, 230, 255, 0)');
-      ctx.fillStyle = glow;
-      ctx.fillRect(0, 0, W, H * 0.5);
-      ctx.restore();
-    } else {
-      // 经典深海：4 条顶部光柱
-      ctx.save();
-      ctx.globalCompositeOperation = 'lighter';
-      for (let i = 0; i < 4; i++) {
-        const x = W * (0.15 + i * 0.22) + Math.sin(t * 0.25 + i) * 26;
-        const lg = ctx.createLinearGradient(x, 0, x + 70, H * 0.8);
-        lg.addColorStop(0, pal.beam);
-        lg.addColorStop(1, pal.beamFade);
-        ctx.fillStyle = lg;
-        ctx.beginPath();
-        ctx.moveTo(x - 30, 0);
-        ctx.lineTo(x + 40, 0);
-        ctx.lineTo(x + 110, H);
-        ctx.lineTo(x - 70, H);
-        ctx.closePath();
-        ctx.fill();
-      }
-      ctx.restore();
-    }
-
-    // 水草
+    // 动态水草叶片
     drawPlants(t);
 
     // 气泡
@@ -1387,13 +1460,42 @@
       ctx.lineCap = 'round';
       ctx.stroke();
     }
+    ctx.restore();
+  }
+
+  // 静态背景（水体渐变 / 顶部柔光 / 沙底）画到离屏画布，仅在尺寸或配色变化时重建
+  function buildBackground() {
+    const c = bgCtx;
+    const g = c.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, pal.waterTop);
+    g.addColorStop(0.45, pal.waterMid);
+    g.addColorStop(1, pal.waterBot);
+    c.fillStyle = g;
+    c.fillRect(0, 0, W, H);
+
+    // 顶部柔光：两主题统一用静态横向柔光，替代原来的 4 条动态光柱（省 4 个渐变 + 多边形）
+    const cartoon = currentTheme() === 'cartoon';
+    const glow = c.createLinearGradient(0, 0, 0, H * 0.55);
+    if (cartoon) {
+      glow.addColorStop(0, 'rgba(205,238,255,.6)');
+      glow.addColorStop(0.45, 'rgba(180,230,255,.24)');
+      glow.addColorStop(1, 'rgba(180,230,255,0)');
+    } else {
+      glow.addColorStop(0, pal.beam);
+      glow.addColorStop(0.5, pal.beamFade);
+      glow.addColorStop(1, 'rgba(140,235,255,0)');
+    }
+    c.fillStyle = glow;
+    c.fillRect(0, 0, W, H * 0.55);
+
     // 沙底
-    const sg = ctx.createLinearGradient(0, H - 26, 0, H);
+    const sg = c.createLinearGradient(0, H - 26, 0, H);
     sg.addColorStop(0, pal.sandA);
     sg.addColorStop(1, pal.sandB);
-    ctx.fillStyle = sg;
-    ctx.fillRect(0, H - 26, W, 26);
-    ctx.restore();
+    c.fillStyle = sg;
+    c.fillRect(0, H - 26, W, 26);
+
+    bgDirty = false;
   }
 
   // 饥饿标记画在世界坐标里，不受鱼的朝向/旋转影响
@@ -1422,7 +1524,7 @@
     const r = fishRadius(f, s);
     const look = FishArt.normalize(f.look || f.species);
     const hungry = f.hunger < 15;
-    const wag = Math.sin(s.phase) * 0.32;
+    const wag = Math.sin(s.phase) * 0.32 * s.wagAmp;
     const tilt = Math.sin(s.phase * 0.6) * 0.05;
     // 饱和度/明度按主题微调：明亮卡通更饱和明亮，经典深海保持原样
     const sat = Math.min(96, (hungry ? 26 : 62) * pal.satK);
@@ -1436,7 +1538,7 @@
       drawShadow(r);
     }
     FishArt.draw(ctx, {
-      look, r, hue: f.hue, sat, light, wag,
+      look, r, hue: f.hue, sat, light, wag, id: f.id, time: t,
       ink: pal.fishInk, inkW: pal.inkW, gape: s.gape, phase: s.phase,
     });
     ctx.restore();

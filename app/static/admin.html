@@ -39,7 +39,12 @@
   </header>
 
   <main class="adWrap">
-    <section class="adCard">
+    <div class="adTabs" role="tablist" aria-label="后台设置分类">
+      <button class="adTab is-active" type="button" role="tab" aria-selected="true" data-tab="global">全局参数</button>
+      <button class="adTab" type="button" role="tab" aria-selected="false" data-tab="species">鱼种参数</button>
+    </div>
+
+    <section id="tabGlobal" class="adCard tabPanel" data-panel="global" role="tabpanel">
       <h2>全局运行参数 <span class="tag">保存即生效</span></h2>
       <p class="adHint">
         这些参数原先写死在 <code>game.py</code> 顶部，现在统一由后台配置并持久化到数据库；
@@ -53,26 +58,28 @@
       </div>
     </section>
 
-    <section class="adCard">
-      <h2>鱼种参数 <span class="tag">可增删 · 可选外观</span></h2>
+    <section id="tabSpecies" class="adCard tabPanel hidden" data-panel="species" role="tabpanel">
+      <h2>鱼种参数 <span class="tag">可新增 · 可上下架 · 可选外观</span></h2>
       <p class="adHint">
         名称 / 价格 / 体型系数 / 产币系数 / 描述均可调整，也可新增鱼种。
-        「标识」是数据库与外观识别的 key（小写字母开头，字母数字下划线）；
-        「外观造型」决定这条鱼在鱼缸里的样子和游动方式，可从下方造型库挑选。
-        删除仍在被鱼使用的鱼种时，会自动改为「下架」——不再出现在购买列表，已有的鱼不受影响。
+        「外观造型」决定这条鱼在鱼缸里的样子和游动方式，在本行「外观造型」下拉里挑选，新增时需自行选择。
+        鱼种一经添加便不能删除，如需停用请取消「上架」勾选——不再出现在购买列表，已有的鱼不受影响。
       </p>
-      <div class="lookLibrary">
+      <div class="lookLibrary" id="lookLibrary">
         <div class="lookLibHead">
-          <div><b>外观造型库</b><span>点击造型设为新增鱼种的默认外观，保存后前台按所选造型绘制</span></div>
-          <span class="lookPickTip" id="lookPickTip">新增默认：鲤鱼</span>
+          <div><b>外观造型预览</b><span>点右侧箭头可折叠，节省空间</span></div>
+          <button id="btnFoldLooks" class="foldBtn" type="button" aria-expanded="true" aria-controls="lookGallery" title="展开 / 折叠外观预览">
+            <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M5 7.5 10 12.5 15 7.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
         </div>
+        <div class="lookCatTabs" id="lookCatTabs" role="tablist" aria-label="外观分类"></div>
         <div class="lookGallery" id="lookGallery"></div>
       </div>
       <div class="tableWrap">
         <table class="adTable" id="spTable">
           <thead>
             <tr>
-              <th>标识</th>
+              <th class="colKey">标识</th>
               <th>名称</th>
               <th>外观造型</th>
               <th>价格(币)</th>
@@ -80,7 +87,7 @@
               <th>产币系数</th>
               <th>描述</th>
               <th>上架</th>
-              <th></th>
+              <th>操作</th>
             </tr>
           </thead>
           <tbody></tbody>
