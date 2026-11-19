@@ -9,6 +9,11 @@
   const bubbles = [];
   let hoverId = null;
 
+  // 调试钩子：仅 ?perf=1 时暴露，供自动化测试读取鱼只实时坐标
+  if (location.search.includes('perf=1')) {
+    window.__sims = sims;
+  }
+
   const canvas = $('#tank');
   const ctx = canvas.getContext('2d');
   let W = 0, H = 0, DPR = 1;
@@ -1625,7 +1630,9 @@
       return;
     }
     // 空白处轻点：附近的鱼朝该处游去
+    // 固着生物（砗磲等）不响应：它每帧直接吸附到目标点，会瞬间"跳"到点击处
     for (const [, s] of sims) {
+      if (s.pattern === 'sessile') continue;
       if (Math.random() > 0.6) { s.tx = x; s.ty = y; s.hold = 0; }
     }
   }
