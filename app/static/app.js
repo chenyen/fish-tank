@@ -319,9 +319,12 @@
       const maxed = !f.stage.next_name;          // 已达最高阶段
       const growPct = Math.round(f.stage.progress * 100);
       const rateTxt = f.growth_per_hour ? ` · ${f.growth_per_hour}/时` : '';
-      const stageTxt = f.stage.next_name
-        ? '距' + f.stage.next_name + ' ' + Math.max(0, Math.round(f.stage.next_at - f.growth))
-        : '已满级';
+      // 距离文案统一用「距升级」，具体目标阶段放到悬停提示里
+      const stageGap = Math.max(0, Math.round(f.stage.next_at - f.growth));
+      const stageTxt = f.stage.next_name ? '距升级 ' + stageGap : '已满级';
+      const stageTip = f.stage.next_name
+        ? '当前「' + f.stage.name + '」，再长 ' + stageGap + ' 成长值进入「' + f.stage.next_name + '」'
+        : '已达最高阶段';
       const sell = f.sell || {};
       const sellable = !!sell.sellable;
       const sellBar = sellable
@@ -330,7 +333,7 @@
       // 满级后不再显示成长相关（成长进度/成长速率/距下一阶段）
       const growBlock = maxed ? '' : `
         <div class="bar grow"><i style="width:${growPct}%"></i></div>
-        <div class="meta"><span>成长 ${growPct}%${rateTxt}</span><span>${stageTxt}</span></div>`;
+        <div class="meta"><span>成长 ${growPct}%${rateTxt}</span><span title="${esc(stageTip)}">${stageTxt}</span></div>`;
       return `<div class="fishitem ${sellable ? 'is-max' : ''}" data-id="${f.id}" title="点击喂食">
         <div class="top"><b class="fname" data-id="${f.id}" title="点击给这条鱼改名">${esc(f.name)}</b><span class="topRight"><span class="stag">${esc(f.species_name || '鱼苗')} · ${esc(f.stage.name)}</span></span></div>
         ${growBlock}
