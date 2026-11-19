@@ -62,7 +62,7 @@ GLOBAL_FIELDS = [
      "hint": "新玩家注册时发放的金币", "group": "产币与经济"},
     {"key": "sell_mult", "label": "满级卖价倍率", "type": "float", "min": 0,
      "max": 100, "step": 0.5, "unit": "倍", "default": 3.0, "decimals": 1,
-     "hint": "满级鱼（成长到顶级「锦鲤」，所有鱼种通用）卖出价 = 鱼种买价 × 本倍率 + 养成期间投喂的饲料钱。倍率越大卖得越多",
+     "hint": "满级鱼（成长到顶级「极品」，所有鱼种通用）卖出价 = 鱼种买价 × 本倍率 + 养成期间投喂的饲料钱。倍率越大卖得越多",
      "group": "产币与经济"},
     {"key": "food_pack_size", "label": "每包饲料份数", "type": "int", "min": 1,
      "max": 999, "step": 1, "unit": "份", "default": 5,

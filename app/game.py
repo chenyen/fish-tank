@@ -91,14 +91,15 @@ STAGES = [
     {"key": "fry", "name": "鱼苗", "at": 0, "scale": 0.55},
     {"key": "juvenile", "name": "幼鱼", "at": 150, "scale": 0.75},
     {"key": "adult", "name": "成鱼", "at": 500, "scale": 1.0},
-    {"key": "koi", "name": "锦鲤", "at": 1200, "scale": 1.2},
+    # 顶级阶段用「极品」，避免与鱼种「锦鲤」混淆（所有鱼种通用）
+    {"key": "prime", "name": "极品", "at": 1200, "scale": 1.2},
 ]
 
 # 各阶段基础产币率（金币/小时，产能 100% 时）
-COIN_RATES = {"fry": 2.0, "juvenile": 5.0, "adult": 10.0, "koi": 20.0}
+COIN_RATES = {"fry": 2.0, "juvenile": 5.0, "adult": 10.0, "prime": 20.0}
 
 # 进阶奖励（一次性，立即入账）
-ADVANCE_REWARD = {"juvenile": 15.0, "adult": 40.0, "koi": 120.0}
+ADVANCE_REWARD = {"juvenile": 15.0, "adult": 40.0, "prime": 120.0}
 
 # 饱食度 → 产能系数（阶梯）
 HUNGER_TIERS = [(80, 1.0), (50, 0.8), (20, 0.5)]
@@ -289,14 +290,14 @@ def is_adult(fish: dict) -> bool:
 
 
 def is_max_level(fish: dict) -> bool:
-    """满级：成长到最后一个阶段（默认「锦鲤」，at=1200）。"""
+    """满级：成长到最后一个阶段（顶级「极品」，at=1200）。"""
     return fish["growth"] >= STAGES[-1]["at"]
 
 
 def sell_value(fish: dict, cfg: dict | None = None) -> dict:
     """满级鱼卖出价 = 鱼种买价 × 卖价倍率 + 养成饲料钱。
 
-    所有鱼种统一：长到最高阶段（顶级「锦鲤」，growth ≥ 1200）才能卖出。
+    所有鱼种统一：长到最高阶段（顶级「极品」，growth ≥ 1200）才能卖出。
     饲料钱按「累计投喂份数 × 每份饲料单价」折算；每份单价 = 每包价格 / 每包份数。
     返回明细，方便前端展示构成。未满级的鱼仍给出估价（sellable=False）。
     """

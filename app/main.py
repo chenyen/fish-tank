@@ -580,7 +580,7 @@ def rename_fish(body: FishRename, request: Request):
 
 @app.post("/api/fish/sell")
 def sell_fish(body: FishSell, request: Request):
-    """卖出满级鱼（成长到顶级「锦鲤」，所有鱼种通用）。校验后删除鱼并把卖价入账。"""
+    """卖出满级鱼（成长到顶级「极品」，所有鱼种通用）。校验后删除鱼并把卖价入账。"""
     with _lock, db.session() as conn:
         user = current_user(request, conn)
         cfg = config.load(conn)
